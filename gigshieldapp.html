@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GigShield — Income Protection for Delivery Partners</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --bg:      #0B0F1A;
+  --surf:    #131929;
+  --card:    #1A2236;
+  --cardhi:  #202d44;
+  --bdr:     #1f2e47;
+  --acc:     #F97316;
+  --accg:    rgba(249,115,22,.12);
+  --grn:     #22C55E;
+  --yel:     #F59E0B;
+  --red:     #EF4444;
+  --txt:     #EEF2FF;
+  --sub:     #8B9CC8;
+  --muted:   #44547A;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:var(--bg);color:var(--txt);
+  font-family:'Instrument Sans',sans-serif;
+  min-height:100vh;display:flex;
+  align-items:center;justify-content:center;
+  padding:24px;
+}
+.jak{font-family:'Plus Jakarta Sans',sans-serif}
+
+/* ── SHELL ── */
+.shell{
+  width:390px;height:844px;
+  background:var(--surf);border-radius:50px;
+  border:1.5px solid var(--bdr);overflow:hidden;
+  position:relative;flex-shrink:0;
+  box-shadow:0 40px 100px rgba(0,0,0,.85),
+             0 0 0 1px rgba(255,255,255,.03) inset,
+             inset 0 1px 0 rgba(255,255,255,.05);
+}
+.island{
+  position:absolute;top:12px;left:50%;
+  transform:translateX(-50%);
+  width:126px;height:34px;
+  background:#000;border-radius:20px;z-index:20;
+}
+.scr{
+  width:100%;height:100%;
+  overflow-y:auto;overflow-x:hidden;
+  scrollbar-width:none;padding-top:56px;
+}
+.scr::-webkit-scrollbar{display:none}
+
+/* ── STATUS BAR ── */
+.sbar{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:0 28px 4px;font-size:13px;font-weight:600;color:var(--sub);
+}
+.sbar-right{display:flex;gap:5px;align-items:center;font-size:12px}
+
+/* ── ANIMATIONS ── */
+@keyframes up{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes breathe{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes ripple{0%{transform:scale(1);opacity:.5}100%{transform:scale(2.8);opacity:0}}
+@keyframes pop{
+  0%{transform:scale(.35);opacity:0}
+  65%{transform:scale(1.1)}
+  85%{transform:scale(.97)}
+  100%{transform:scale(1);opacity:1}
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.au{animation:up .45s ease both}
+.af{animation:fade .3s ease both}
+
+/* ── BUTTONS ── */
+.btn{
+  width:100%;padding:15px;
+  background:var(--acc);color:#fff;
+  border:none;border-radius:14px;
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:15px;font-weight:700;cursor:pointer;
+  transition:all .18s;letter-spacing:.2px;
+}
+.btn:hover{background:#e8640a;transform:translateY(-1px);box-shadow:0 10px 28px rgba(249,115,22,.28)}
+.btn:active{transform:translateY(0);box-shadow:none}
+.btn:disabled{opacity:.38;cursor:not-allowed;transform:none!important;box-shadow:none!important}
+.btn-ghost{
+  width:100%;padding:14px;
+  background:transparent;color:var(--sub);
+  border:1px solid var(--bdr);border-radius:14px;
+  font-family:'Instrument Sans',sans-serif;
+  font-size:14px;cursor:pointer;transition:all .18s;
+}
+.btn-ghost:hover{border-color:var(--muted);color:var(--txt)}
+.btn-sm{
+  padding:8px 16px;background:var(--acc);color:#fff;
+  border:none;border-radius:10px;
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:12px;font-weight:700;cursor:pointer;transition:all .18s;
+}
+.btn-sm:hover{background:#e8640a}
+
+/* ── FORM ── */
+.fld{
+  width:100%;padding:13px 15px;
+  background:var(--card);border:1px solid var(--bdr);
+  border-radius:12px;color:var(--txt);
+  font-size:15px;font-family:'Instrument Sans',sans-serif;
+  outline:none;transition:border-color .2s;
+  -webkit-appearance:none;appearance:none;
+}
+.fld:focus{border-color:var(--acc)}
+.fld::placeholder{color:var(--muted)}
+.lbl{
+  font-size:11px;color:var(--sub);font-weight:600;
+  letter-spacing:.6px;text-transform:uppercase;
+  margin-bottom:6px;display:block;
+}
+.hint{font-size:12px;color:var(--muted);margin-top:5px}
+
+/* ── CARD ── */
+.card{background:var(--card);border:1px solid var(--bdr);border-radius:18px;padding:18px}
+.card-sm{background:var(--card);border:1px solid var(--bdr);border-radius:14px;padding:14px}
+.div{height:1px;background:var(--bdr)}
+
+/* ── PILL ── */
+.pill{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:20px;font-size:12px;font-weight:500}
+
+/* ── OTP ── */
+.otp-row{display:flex;gap:9px;justify-content:center}
+.otp-c{
+  width:50px;height:58px;
+  background:var(--card);border:1.5px solid var(--bdr);
+  border-radius:12px;text-align:center;
+  font-size:22px;font-weight:700;color:var(--txt);
+  font-family:'Plus Jakarta Sans',sans-serif;
+  outline:none;caret-color:var(--acc);transition:border-color .18s;
+}
+.otp-c:focus,.otp-c.on{border-color:var(--acc);background:var(--accg)}
+
+/* ── PROGRESS ── */
+.prog-wrap{height:3px;background:var(--bdr);border-radius:3px;overflow:hidden;margin-bottom:20px}
+.prog-bar{height:100%;background:var(--acc);border-radius:3px;transition:width .5s ease}
+
+/* ── SEGMENTS ── */
+.seg-row{display:flex;gap:8px}
+.seg{
+  flex:1;padding:14px 8px;
+  background:var(--card);border:1.5px solid var(--bdr);
+  border-radius:14px;cursor:pointer;transition:all .18s;
+  display:flex;flex-direction:column;align-items:center;gap:7px;
+}
+.seg.on{border-color:var(--acc);background:var(--accg)}
+.seg-icon{font-size:24px}
+.seg-lbl{font-size:11px;font-weight:600;color:var(--sub)}
+.seg.on .seg-lbl{color:var(--acc)}
+
+/* ── AREA GRID ── */
+.area-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.area-tile{
+  padding:11px 13px;
+  background:var(--card);border:1.5px solid var(--bdr);
+  border-radius:12px;cursor:pointer;transition:all .15s;
+  font-size:13px;color:var(--sub);text-align:left;
+  font-family:'Instrument Sans',sans-serif;
+}
+.area-tile:hover{border-color:var(--muted);color:var(--txt)}
+.area-tile.on{border-color:var(--acc);background:var(--accg);color:var(--acc);font-weight:600}
+
+/* ── RISK BAR ── */
+.rbar-row{display:flex;gap:3px}
+.rbar-seg{flex:1;height:7px;border-radius:4px;transition:background .3s}
+
+/* ── BOTTOM NAV ── */
+.bnav{
+  position:absolute;bottom:0;left:0;right:0;
+  background:var(--surf);border-top:1px solid var(--bdr);
+  display:flex;padding:10px 0 22px;
+}
+.bnav-btn{
+  flex:1;background:none;border:none;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  transition:color .15s;
+}
+.bnav-icon{font-size:22px}
+.bnav-lbl{font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase}
+
+/* ── RIPPLE RING ── */
+.rring{animation:ripple 2s ease infinite}
+
+/* ── STEP TRACKER ── */
+.step-row{
+  display:flex;align-items:center;gap:12px;padding:12px 15px;
+  border-radius:12px;transition:all .35s ease;
+}
+.step-dots{display:flex;gap:3px;margin-left:auto}
+.step-dot{width:5px;height:5px;border-radius:50%;background:var(--acc)}
+
+/* ── DOTS NAV ── */
+.dot-nav{display:flex;gap:7px;align-items:center;margin-top:20px;justify-content:center}
+.dot{height:8px;border-radius:4px;cursor:pointer;transition:all .25s ease}
+</style>
+</head>
+<body>
+
+<div style="display:flex;flex-direction:column;align-items:center">
+  <div class="shell" id="shell">
+    <div class="island"></div>
+    <div class="scr af" id="screen"></div>
+  </div>
+  <div class="dot-nav" id="dots"></div>
+</div>
+
+<script>
+// ── DATA ─────────────────────────────────────────────────────────
+const CITY_AREAS = {
+  "Bengaluru":["Koramangala","Indiranagar","HSR Layout","Whitefield","Jayanagar","Rajajinagar","Yeshwanthpur","Electronic City"],
+  "Mumbai":["Andheri","Bandra","Kurla","Dharavi","Borivali","Dadar","Thane","Navi Mumbai"],
+  "Delhi NCR":["Connaught Place","Lajpat Nagar","Rohini","Dwarka","Noida Sec 18","Gurgaon","Karol Bagh","Saket"],
+  "Chennai":["T. Nagar","Adyar","Velachery","Anna Nagar","Porur","OMR","Tambaram","Egmore"],
+  "Hyderabad":["Banjara Hills","Jubilee Hills","Hitech City","Gachibowli","Ameerpet","Secunderabad","LB Nagar","Kukatpally"],
+  "Kolkata":["Park Street","Salt Lake","New Town","Howrah","Behala","Dum Dum","Tollygunge","Gariahat"],
+  "Pune":["Koregaon Park","Kothrud","Viman Nagar","Hadapsar","Baner","Wakad","Shivajinagar","Pimple Saudagar"],
+};
+const AREA_RISK = {
+  "Koramangala":52,"Indiranagar":48,"HSR Layout":44,"Whitefield":61,"Jayanagar":40,"Rajajinagar":55,"Yeshwanthpur":58,"Electronic City":63,
+  "Andheri":71,"Bandra":65,"Kurla":78,"Dharavi":82,"Borivali":67,"Dadar":69,"Thane":72,"Navi Mumbai":60,
+  "Connaught Place":45,"Lajpat Nagar":49,"Rohini":53,"Dwarka":56,"Noida Sec 18":51,"Gurgaon":48,"Karol Bagh":62,"Saket":47,
+  "T. Nagar":55,"Adyar":68,"Velachery":73,"Anna Nagar":51,"Porur":60,"OMR":64,"Tambaram":57,"Egmore":52,
+  "Banjara Hills":42,"Jubilee Hills":40,"Hitech City":46,"Gachibowli":44,"Ameerpet":55,"Secunderabad":50,"LB Nagar":58,"Kukatpally":52,
+  "Park Street":58,"Salt Lake":63,"New Town":60,"Howrah":71,"Behala":66,"Dum Dum":69,"Tollygunge":61,"Gariahat":57,
+  "Koregaon Park":44,"Kothrud":48,"Viman Nagar":46,"Hadapsar":53,"Baner":50,"Wakad":52,"Shivajinagar":47,"Pimple Saudagar":55,
+};
+const AREA_NOTES = {
+  "Dharavi":"High flood corridor · 8+ events/year historically",
+  "Kurla":"Low-lying zone · Frequent waterlogging",
+  "Andheri":"Monsoon-prone · Near coastal belt",
+  "Howrah":"Cyclone exposure · River flooding risk",
+  "Velachery":"Chennai's most flood-prone suburb",
+  "Whitefield":"Outer ring · Poor drainage infrastructure",
+  "Electronic City":"Seasonal flood risk · Outer zone",
+  "Koramangala":"Moderate risk · Decent drainage infrastructure",
+  "Adyar":"Coastal proximity · Storm surge risk",
+  "Dadar":"Historically waterlogged in heavy rain",
+};
+
+// ── APP STATE ─────────────────────────────────────────────────────
+const state = {
+  screen: 0,
+  phone: "", upi: "",
+  platform: "", city: "", area: "", earnings: 0,
+  riskScore: 0, premium: 0, payout: 0, cap: 0,
+  profileStep: 1,
+  otpSent: false, otp: ["","","","","",""],
+  kycVerified: false,
+  triggerPhase: 0,
+  dashTab: "home",
+  payoutHistory: [
+    { date:"Mar 15", event:"🌧️ Red Alert Rain", amount:350, area:"Koramangala" },
+    { date:"Feb 28", event:"🌧️ Heavy Rainfall",  amount:350, area:"Koramangala" },
+    { date:"Jan 14", event:"😷 AQI Emergency",   amount:150, area:"Koramangala" },
+  ],
+  triggerTimer: null,
+};
+const SCREENS = ["splash","otp","kyc","profile","quote","dashboard","trigger"];
+
+function calcPricing() {
+  state.premium = Math.round(35 + (state.riskScore/100)*30 + (Math.min(state.earnings,6000)/6000)*15);
+  state.payout  = Math.round(Math.min(state.earnings*.085, 600));
+  state.cap     = Math.round(Math.min(state.earnings*.22,  1400));
+}
+
+function riskLabel(s){ return s>65?"High":s>50?"Medium":"Low" }
+function riskColor(s){ return s>65?"var(--red)":s>50?"var(--yel)":"var(--grn)" }
+
+// ── RENDER ENGINE ────────────────────────────────────────────────
+function go(idx){
+  if(state.triggerTimer){ clearTimeout(state.triggerTimer); state.triggerTimer=null; }
+  state.screen = Math.max(0, Math.min(idx, SCREENS.length-1));
+  render();
+}
+
+function render(){
+  const scr = document.getElementById("screen");
+  scr.className = "scr af";
+  void scr.offsetWidth;
+  scr.innerHTML = screens[SCREENS[state.screen]]();
+  renderDots();
+  bindEvents();
+}
+
+function renderDots(){
+  const d = document.getElementById("dots");
+  d.innerHTML = SCREENS.map((_,i)=>`
+    <div class="dot" data-i="${i}" style="
+      width:${i===state.screen?22:8}px;
+      background:${i===state.screen?"var(--acc)":i<state.screen?"var(--grn)":"var(--bdr)"};
+    "></div>`).join("");
+  d.querySelectorAll(".dot").forEach(el=>el.addEventListener("click",()=>go(+el.dataset.i)));
+}
+
+// ── SHARED HELPERS ────────────────────────────────────────────────
+function sbar(time="9:41"){
+  return `<div class="sbar"><span>${time}</span><div class="sbar-right"><span>●●●●</span><span>WiFi</span><span>🔋</span></div></div>`;
+}
+function prog(pct){
+  return `<div class="prog-wrap"><div class="prog-bar" style="width:${pct}%"></div></div>`;
+}
+function stepHdr(step, title){
+  return `<div style="margin-bottom:18px">
+    <div style="font-size:11px;color:var(--acc);font-weight:700;letter-spacing:.8px;text-transform:uppercase;margin-bottom:7px">${step}</div>
+    <div class="jak" style="font-size:24px;font-weight:800;line-height:1.2">${title}</div>
+  </div>`;
+}
+function rbarHtml(score){
+  return `<div class="rbar-row">${Array.from({length:10}).map((_,i)=>
+    `<div class="rbar-seg" style="background:${i<Math.round(score/10)?riskColor(score):"var(--bdr)"}"></div>`
+  ).join("")}</div>`;
+}
+
+// ── SCREENS ──────────────────────────────────────────────────────
+const screens = {
+
+// ── 1. SPLASH ────────────────────────────────────────────────────
+splash: ()=>`
+  <div style="padding:16px 26px 36px;height:100%;display:flex;flex-direction:column">
+    ${sbar()}
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+      <div class="au">
+        <div style="width:70px;height:70px;border-radius:22px;background:linear-gradient(145deg,#F97316,#c2571a);display:flex;align-items:center;justify-content:center;font-size:32px;margin-bottom:22px;box-shadow:0 14px 36px rgba(249,115,22,.32)">🛡️</div>
+        <div class="jak" style="font-size:34px;font-weight:800;line-height:1.1;margin-bottom:6px">Gig<span style="color:var(--acc)">Shield</span></div>
+        <div style="font-size:15px;color:var(--sub);line-height:1.65;margin-bottom:28px">Income protection for delivery partners.<br>Auto payouts when the weather shuts you down.</div>
+        ${[["🌧️","Covers rain, smog, bandh, cyclone"],["⚡","UPI payout in under 15 minutes"],["₹42","Per week. Zero paperwork. Zero waiting."]].map(([icon,text],i)=>`
+          <div class="au" style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px;animation-delay:${i*.08}s">
+            <div style="width:32px;height:32px;border-radius:10px;background:var(--accg);border:1px solid rgba(249,115,22,.25);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">${icon}</div>
+            <span style="font-size:14px;color:var(--sub);line-height:1.55;padding-top:5px">${text}</span>
+          </div>`).join("")}
+      </div>
+      <div class="au" style="animation-delay:.3s;display:flex;flex-direction:column;gap:10px;margin-top:8px">
+        <button class="btn" id="btn-start">Get Protected — Free to Try</button>
+        <div style="text-align:center;font-size:12px;color:var(--muted)">For Zomato & Swiggy delivery partners</div>
+      </div>
+    </div>
+  </div>`,
+
+// ── 2. OTP ───────────────────────────────────────────────────────
+otp: ()=>`
+  <div style="padding:16px 26px 36px">
+    ${sbar()}
+    <div style="margin-top:20px">
+      ${prog(state.otpSent?40:20)}
+      ${stepHdr("Step 1 of 4", state.otpSent?"Enter the code":"What's your number?")}
+      <div style="font-size:14px;color:var(--sub);margin-bottom:22px;line-height:1.6">
+        ${state.otpSent?`We sent a 6-digit code to +91 ${state.phone.slice(0,5)}XXXXX`:"Just your number — we'll send a one-time code. No spam."}
+      </div>
+      ${!state.otpSent ? `
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div>
+            <label class="lbl">Mobile Number</label>
+            <div style="display:flex;gap:8px">
+              <div style="padding:13px 12px;background:var(--card);border:1px solid var(--bdr);border-radius:12px;font-size:15px;color:var(--sub);white-space:nowrap">🇮🇳 +91</div>
+              <input class="fld" id="inp-phone" type="tel" placeholder="98765 43210" value="${state.phone}" maxlength="10" />
+            </div>
+          </div>
+          <button class="btn" id="btn-sendotp" ${state.phone.length<10?"disabled":""}>Send OTP</button>
+        </div>` : `
+        <div style="display:flex;flex-direction:column;gap:22px">
+          <div class="otp-row">
+            ${state.otp.map((d,i)=>`<input class="otp-c ${d?"on":""}" data-idx="${i}" maxlength="1" value="${d}" type="tel" />`).join("")}
+          </div>
+          <button class="btn" id="btn-verifyotp">Verify & Continue →</button>
+          <div style="text-align:center;font-size:13px;color:var(--muted)">
+            Didn't get it? <span style="color:var(--acc);cursor:pointer" id="resend-link">Resend in 28s</span>
+          </div>
+        </div>`}
+    </div>
+  </div>`,
+
+// ── 3. KYC ───────────────────────────────────────────────────────
+kyc: ()=>`
+  <div style="padding:16px 26px 36px">
+    ${sbar()}
+    <div style="margin-top:20px">
+      ${prog(40)}
+      ${stepHdr("Step 2 of 4","Quick verification")}
+      <div style="font-size:14px;color:var(--sub);margin-bottom:22px;line-height:1.6">
+        One-time KYC. Takes under a minute. Your Aadhaar is hashed — we never store the actual digits.
+      </div>
+      ${!state.kycVerified ? `
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div>
+            <label class="lbl">Aadhaar Number</label>
+            <input class="fld" id="inp-aadhaar" type="tel" placeholder="1234 5678 9012" maxlength="14" />
+            <div class="hint">Used only for identity check · Not stored</div>
+          </div>
+          <div>
+            <label class="lbl">UPI ID (for your payouts)</label>
+            <input class="fld" id="inp-upi" type="text" placeholder="yourname@phonepe or @gpay" value="${state.upi}" />
+            <div class="hint">Double-check this — this is where the money goes</div>
+          </div>
+          <div class="card-sm" style="background:rgba(249,115,22,.06);border-color:rgba(249,115,22,.2);display:flex;gap:11px;align-items:flex-start">
+            <span style="font-size:18px;flex-shrink:0">🔒</span>
+            <div style="font-size:13px;color:var(--sub);line-height:1.6">Verified through UIDAI's e-KYC API. We store a hash, not your number. One Aadhaar = one policy.</div>
+          </div>
+          <button class="btn" id="btn-kyc">Verify My Identity →</button>
+        </div>` : `
+        <div class="au" style="text-align:center;padding-top:16px">
+          <div style="width:80px;height:80px;border-radius:50%;background:rgba(34,197,94,.12);border:2px solid var(--grn);display:flex;align-items:center;justify-content:center;font-size:36px;margin:0 auto 18px;animation:pop .6s cubic-bezier(.34,1.56,.64,1) both">✅</div>
+          <div class="jak" style="font-size:20px;font-weight:800;margin-bottom:6px">You're verified</div>
+          <div style="font-size:14px;color:var(--sub);margin-bottom:6px;line-height:1.6">Aadhaar confirmed · UPI linked</div>
+          <div style="font-size:13px;color:var(--muted);margin-bottom:28px;font-style:italic">${state.upi}</div>
+          <button class="btn" id="btn-kyc-next">Set Up My Profile →</button>
+        </div>`}
+    </div>
+  </div>`,
+
+// ── 4. PROFILE ───────────────────────────────────────────────────
+profile: ()=>{
+  const ps = state.profileStep;
+  const areas = state.city ? CITY_AREAS[state.city] : [];
+  const rs = state.area ? (AREA_RISK[state.area]||55) : null;
+  const note = state.area ? (AREA_NOTES[state.area]||"") : "";
+  const earningsNum = parseInt(state.earnings)||0;
+
+  return `
+  <div style="padding:16px 26px 36px">
+    ${sbar()}
+    <div style="margin-top:20px">
+      ${prog(ps===1?55:ps===2?68:82)}
+      ${stepHdr("Step 3 of 4", ps===1?"Where you work":ps===2?"Your neighbourhood":"Your earnings")}
+
+      ${ps===1?`
+        <div class="au" style="display:flex;flex-direction:column;gap:16px">
+          <div style="font-size:14px;color:var(--sub);margin-bottom:4px;line-height:1.6">Helps us calculate your flood, AQI and disruption exposure before we set your premium.</div>
+          <div>
+            <label class="lbl">Which platform?</label>
+            <div class="seg-row">
+              ${[["🍽️","Zomato"],["🛵","Swiggy"],["📦","Both"]].map(([icon,p])=>`
+                <button class="seg ${state.platform===p?"on":""}" data-platform="${p}">
+                  <span class="seg-icon">${icon}</span>
+                  <span class="seg-lbl">${p}</span>
+                </button>`).join("")}
+            </div>
+          </div>
+          <div>
+            <label class="lbl">City</label>
+            <select class="fld" id="sel-city" style="cursor:pointer">
+              <option value="">Pick your city</option>
+              ${Object.keys(CITY_AREAS).map(c=>`<option value="${c}" ${state.city===c?"selected":""}>${c}</option>`).join("")}
+            </select>
+          </div>
+          <button class="btn" id="btn-p1" ${!state.platform||!state.city?"disabled":""}>Continue →</button>
+        </div>`
+
+      :ps===2?`
+        <div class="au" style="display:flex;flex-direction:column;gap:16px">
+          <div style="font-size:14px;color:var(--sub);margin-bottom:4px;line-height:1.6">Flood and AQI risk in ${state.city} varies a lot by neighbourhood. Pick the area you work most.</div>
+          <div>
+            <label class="lbl">Your main delivery area</label>
+            <div class="area-grid">
+              ${areas.map(a=>`<button class="area-tile ${state.area===a?"on":""}" data-area="${a}">${a}</button>`).join("")}
+            </div>
+          </div>
+          ${rs?`
+            <div class="au card-sm" style="background:rgba(249,115,22,.06);border-color:rgba(249,115,22,.2)">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                <div style="font-size:13px;font-weight:600">${state.area}</div>
+                <div class="jak" style="font-size:16px;font-weight:800;color:${riskColor(rs)}">${riskLabel(rs)} risk</div>
+              </div>
+              ${rbarHtml(rs)}
+              ${note?`<div style="font-size:12px;color:var(--muted);line-height:1.5;margin-top:8px">${note}</div>`:""}
+            </div>`:""}
+          <div style="display:flex;gap:8px">
+            <button class="btn-ghost" id="btn-p2-back" style="width:auto;padding:14px 18px">←</button>
+            <button class="btn" id="btn-p2" ${!state.area?"disabled":""}>Continue →</button>
+          </div>
+        </div>`
+
+      :`
+        <div class="au" style="display:flex;flex-direction:column;gap:16px">
+          <div style="font-size:14px;color:var(--sub);margin-bottom:4px;line-height:1.6">We use this to set your payout amount. Self-declared for now — verified from platform data later.</div>
+          <div>
+            <label class="lbl">Avg. weekly earnings (₹)</label>
+            <input class="fld" id="inp-earnings" type="number" placeholder="e.g. 4200" value="${state.earnings||""}" />
+            <div class="hint">Your last 4-week average from Zomato/Swiggy payouts</div>
+          </div>
+          ${earningsNum>0?`
+            <div class="au card-sm" style="background:rgba(34,197,94,.06);border-color:rgba(34,197,94,.2)">
+              <div style="display:flex;justify-content:space-between;margin-bottom:7px">
+                <span style="font-size:13px;color:var(--sub)">Per-event payout</span>
+                <span class="jak" style="font-size:16px;font-weight:800;color:var(--grn)">₹${Math.round(Math.min(earningsNum*.085,600))}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between">
+                <span style="font-size:13px;color:var(--sub)">Weekly cap</span>
+                <span class="jak" style="font-size:16px;font-weight:800;color:var(--grn)">₹${Math.round(Math.min(earningsNum*.22,1400))}</span>
+              </div>
+            </div>`:""}
+          <div style="display:flex;gap:8px">
+            <button class="btn-ghost" id="btn-p3-back" style="width:auto;padding:14px 18px">←</button>
+            <button class="btn" id="btn-p3" ${!earningsNum||earningsNum<500?"disabled":""}>See My Quote →</button>
+          </div>
+        </div>`}
+    </div>
+  </div>`;
+},
+
+// ── 5. QUOTE ─────────────────────────────────────────────────────
+quote: ()=>`
+  <div style="padding:16px 26px 36px">
+    ${sbar()}
+    <div style="margin-top:20px">
+      ${prog(92)}
+      ${stepHdr("Step 4 of 4","Your cover")}
+
+      <div class="card au" style="margin-bottom:13px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:13px">
+          <div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:3px">${state.area}, ${state.city}</div>
+            <div class="jak" style="font-size:19px;font-weight:800;color:${riskColor(state.riskScore)}">${riskLabel(state.riskScore)} Zone</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:2px">Risk score</div>
+            <div class="jak" style="font-size:24px;font-weight:800">${state.riskScore}<span style="font-size:13px;color:var(--muted)">/100</span></div>
+          </div>
+        </div>
+        ${rbarHtml(state.riskScore)}
+        ${AREA_NOTES[state.area]?`<div style="font-size:12px;color:var(--muted);margin-top:9px;line-height:1.5">${AREA_NOTES[state.area]}</div>`:""}
+      </div>
+
+      <div class="card au" style="border-color:var(--acc);background:linear-gradient(145deg,var(--card),var(--accg));margin-bottom:13px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <div class="jak" style="font-size:15px;font-weight:700">Weekly Shield</div>
+          <div class="pill" style="background:rgba(249,115,22,.15);color:var(--acc);border:1px solid rgba(249,115,22,.3)">BEST FIT</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px">
+          <div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:2px">Weekly premium</div>
+            <div class="jak" style="font-size:36px;font-weight:800;color:var(--acc);line-height:1">₹${state.premium}<span style="font-size:14px;color:var(--muted);font-weight:400">/wk</span></div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:2px">Per event</div>
+            <div class="jak" style="font-size:22px;font-weight:800;color:var(--grn)">₹${state.payout}</div>
+          </div>
+        </div>
+        <div class="div" style="margin-bottom:13px"></div>
+        ${[["🌧️","Heavy Rain / Flood",`₹${state.payout}`],["😷","Severe AQI (>400)","₹150/day"],["🚫","Bandh / Section 144",`₹${state.payout}`],["🌀","Cyclone Warning",`₹${state.cap} cap`],["🌡️","Heatwave Advisory","₹100/day"]].map(([icon,name,val],i,arr)=>`
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;${i<arr.length-1?`border-bottom:1px solid var(--bdr)`:""}">
+            <div style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--sub)">${icon} ${name}</div>
+            <div style="font-size:13px;font-weight:600;color:var(--txt)">${val}</div>
+          </div>`).join("")}
+        <div class="div" style="margin:13px 0"></div>
+        <div style="display:flex;justify-content:space-between;font-size:13px">
+          <span style="color:var(--sub)">Weekly cap</span>
+          <span class="jak" style="font-weight:700;color:var(--grn)">₹${state.cap}</span>
+        </div>
+      </div>
+
+      <button class="btn" id="btn-activate">Activate Shield — ₹${state.premium}/week →</button>
+      <div style="text-align:center;font-size:12px;color:var(--muted);margin-top:10px">Auto-debit every Monday via UPI AutoPay · Cancel anytime</div>
+    </div>
+  </div>`,
+
+// ── 6. DASHBOARD ─────────────────────────────────────────────────
+dashboard: ()=>`
+  <div style="height:100%;display:flex;flex-direction:column">
+    ${sbar("6:52 PM")}
+    <div style="padding:12px 22px 6px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:13px;color:var(--muted)">Good evening,</div>
+        <div class="jak" style="font-size:22px;font-weight:800">Ravi Kumar 👋</div>
+      </div>
+      <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#F97316,#c2571a);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff">R</div>
+    </div>
+
+    <div style="flex:1;overflow-y:auto;overflow-x:hidden;padding:12px 22px 88px;scrollbar-width:none">
+      <div style="display:flex;flex-direction:column;gap:12px;animation:up .4s ease both">
+
+        <!-- Shield card -->
+        <div class="card" style="background:linear-gradient(145deg,#0e1e35,#162840);border-color:rgba(34,197,94,.25);position:relative;overflow:hidden">
+          <div style="position:absolute;top:-24px;right:-24px;width:100px;height:100px;border-radius:50%;background:rgba(34,197,94,.07);filter:blur(24px)"></div>
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+            <div>
+              <div style="display:flex;align-items:center;gap:7px;margin-bottom:5px">
+                <div style="width:7px;height:7px;border-radius:50%;background:var(--grn);box-shadow:0 0 7px var(--grn)"></div>
+                <span style="font-size:10px;color:var(--grn);font-weight:700;letter-spacing:.5px">SHIELD ACTIVE</span>
+              </div>
+              <div class="jak" style="font-size:17px;font-weight:700">Covered until Sun, Mar 29</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:3px">₹${state.premium} paid · Mon 23 Mar · ${state.area}</div>
+            </div>
+            <span style="font-size:28px">🛡️</span>
+          </div>
+          <div style="display:flex;gap:10px">
+            <div style="flex:1;padding:10px 12px;background:rgba(255,255,255,.04);border-radius:11px;border:1px solid rgba(255,255,255,.06)">
+              <div style="font-size:10px;color:var(--muted);margin-bottom:3px">Saved this year</div>
+              <div class="jak" style="font-size:17px;font-weight:800;color:var(--grn)">₹${state.payoutHistory.reduce((s,h)=>s+h.amount,0)}</div>
+            </div>
+            <div style="flex:1;padding:10px 12px;background:rgba(255,255,255,.04);border-radius:11px;border:1px solid rgba(255,255,255,.06)">
+              <div style="font-size:10px;color:var(--muted);margin-bottom:3px">Max this week</div>
+              <div class="jak" style="font-size:17px;font-weight:800;color:var(--txt)">₹${state.cap}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Alert -->
+        <div class="card" style="background:rgba(249,115,22,.07);border-color:rgba(249,115,22,.25);display:flex;gap:12px">
+          <div style="position:relative;flex-shrink:0;width:40px;height:40px">
+            <div style="width:40px;height:40px;border-radius:50%;background:rgba(249,115,22,.15);display:flex;align-items:center;justify-content:center;font-size:20px;position:relative;z-index:1">🌧️</div>
+            <div class="rring" style="position:absolute;top:0;left:0;width:40px;height:40px;border-radius:50%;border:1.5px solid var(--acc)"></div>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:700;color:var(--acc);margin-bottom:4px">Alert — ${state.area}</div>
+            <div style="font-size:12px;color:var(--sub);line-height:1.55;margin-bottom:10px">IMD forecasts heavy rain Wed–Thu. Your Shield fires automatically if it crosses the threshold.</div>
+            <button class="btn-sm" id="btn-simulate">Simulate trigger →</button>
+          </div>
+        </div>
+
+        <!-- Coverage pills -->
+        <div>
+          <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">What you're covered for</div>
+          <div style="display:flex;flex-wrap:wrap;gap:7px">
+            ${["🌧️ Rain","😷 AQI","🚫 Bandh","🌀 Cyclone","🌡️ Heatwave"].map(c=>`
+              <div class="pill" style="background:var(--card);border:1px solid var(--bdr);color:var(--sub);padding:7px 13px">${c}</div>`).join("")}
+          </div>
+        </div>
+
+        <!-- History -->
+        <div>
+          <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Recent payouts</div>
+          <div class="card" style="padding:4px 0">
+            ${state.payoutHistory.map((h,i)=>`
+              <div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:13px 16px">
+                  <div>
+                    <div style="font-size:13px;font-weight:500">${h.event}</div>
+                    <div style="font-size:11px;color:var(--muted);margin-top:2px">${h.date}, 2026 · ${h.area}</div>
+                  </div>
+                  <div style="text-align:right">
+                    <div class="jak" style="font-size:16px;font-weight:800;color:var(--grn)">₹${h.amount}</div>
+                    <div style="font-size:10px;color:var(--grn);margin-top:2px">✓ Credited</div>
+                  </div>
+                </div>
+                ${i<state.payoutHistory.length-1?'<div class="div"></div>':""}`).join("")}
+          </div>
+        </div>
+
+        <button class="btn-ghost" id="btn-pause">Pause Shield for a Week</button>
+      </div>
+    </div>
+
+    <div class="bnav">
+      ${[["🛡️","Shield"],["📋","History"],["👤","Profile"]].map(([icon,label],i)=>`
+        <button class="bnav-btn" style="color:${i===0?"var(--acc)":"var(--muted)"}">
+          <span class="bnav-icon">${icon}</span>
+          <span class="bnav-lbl">${label}</span>
+        </button>`).join("")}
+    </div>
+  </div>`,
+
+// ── 7. TRIGGER → PAYOUT ──────────────────────────────────────────
+trigger: ()=>{
+  const ph = state.triggerPhase;
+  const steps = [
+    {icon:"🔍",label:"Checking IMD alert data…"},
+    {icon:"🛰️",label:"Red Alert confirmed — Bengaluru"},
+    {icon:"📍",label:`Zone matched — ${state.area}`},
+    {icon:"💸",label:`Transfer to ${state.upi||"ravi@phonepe"}`},
+  ];
+  const ref = `GS${Date.now().toString().slice(-8)}`;
+
+  if(ph < 4) return `
+    <div style="padding:16px 24px 40px;height:100%;display:flex;flex-direction:column">
+      ${sbar("3:24 PM")}
+      <div style="flex:1;display:flex;flex-direction:column;justify-content:center;text-align:center">
+        <div style="position:relative;width:104px;height:104px;margin:0 auto 26px">
+          <div style="width:104px;height:104px;border-radius:50%;background:radial-gradient(circle,var(--accg),transparent);border:1.5px solid rgba(249,115,22,.2);display:flex;align-items:center;justify-content:center;font-size:44px">
+            ${ph<2?"🌧️":ph<3?"🛡️":"⚡"}
+          </div>
+          ${ph%2===0?`<div class="rring" style="position:absolute;top:0;left:0;width:104px;height:104px;border-radius:50%;border:1.5px solid var(--acc)"></div>`:""}
+        </div>
+        <div class="jak" style="font-size:21px;font-weight:800;margin-bottom:7px">
+          ${["IMD alert detected","Alert verified","Zone matched","Sending money…"][ph]}
+        </div>
+        <div style="font-size:14px;color:var(--sub);margin-bottom:26px;line-height:1.6">
+          ${["Checking if this affects your area…","Red Alert is live — threshold crossed","Your area qualifies for a payout","Transfer in progress — almost there"][ph]}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:9px;text-align:left">
+          ${steps.map((s,i)=>{
+            const done=i<ph, active=i===ph;
+            return `<div class="step-row" style="background:${active?"var(--accg)":done?"rgba(34,197,94,.08)":"var(--card)"};border:1px solid ${active?"rgba(249,115,22,.3)":done?"rgba(34,197,94,.2)":"var(--bdr)"};opacity:${i>ph?.35:1}">
+              <span style="font-size:18px;flex-shrink:0">${done?"✅":active?s.icon:"○"}</span>
+              <span style="font-size:13px;color:${active?"var(--acc)":done?"var(--grn)":"var(--muted)"};font-weight:${active||done?600:400}">${s.label}</span>
+              ${active?`<div class="step-dots">${[0,1,2].map(d=>`<div class="step-dot" style="animation:breathe .8s ease ${d*.2}s infinite"></div>`).join("")}</div>`:""}
+            </div>`;
+          }).join("")}
+        </div>
+      </div>
+    </div>`;
+
+  // PAID
+  return `
+    <div style="padding:16px 24px 40px;height:100%;display:flex;flex-direction:column">
+      ${sbar("3:24 PM")}
+      <div style="flex:1;display:flex;flex-direction:column;justify-content:center;text-align:center;animation:up .5s ease both">
+        <div style="position:relative;width:92px;height:92px;margin:0 auto 20px">
+          <div style="width:92px;height:92px;border-radius:50%;background:rgba(34,197,94,.12);border:2px solid var(--grn);display:flex;align-items:center;justify-content:center;font-size:42px;animation:pop .65s cubic-bezier(.34,1.56,.64,1) both">✅</div>
+          <div class="rring" style="position:absolute;top:0;left:0;width:92px;height:92px;border-radius:50%;border:1.5px solid var(--grn)"></div>
+        </div>
+
+        <div class="jak" style="font-size:22px;font-weight:800;margin-bottom:6px">Money's on its way</div>
+        <div style="font-size:14px;color:var(--sub);margin-bottom:22px;line-height:1.6">IMD Red Alert · ${state.area}<br>March 19, 2026 · 3:24 PM</div>
+
+        <div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:18px;padding:18px 22px;margin-bottom:20px;display:inline-block;animation:pop .7s .15s cubic-bezier(.34,1.56,.64,1) both">
+          <div style="font-size:13px;color:var(--grn);margin-bottom:3px">→ ${state.upi||"ravi@phonepe"}</div>
+          <div class="jak" style="font-size:46px;font-weight:800;color:var(--grn);line-height:1">₹${state.payout}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">Ref: ${ref}</div>
+        </div>
+
+        <div style="display:flex;gap:9px;margin-bottom:16px">
+          <div style="flex:1;padding:11px;background:var(--card);border-radius:12px;border:1px solid var(--bdr)">
+            <div style="font-size:10px;color:var(--muted);margin-bottom:3px">Trigger</div>
+            <div style="font-size:12px;font-weight:600">🌧️ Red Alert Rain</div>
+          </div>
+          <div style="flex:1;padding:11px;background:var(--card);border-radius:12px;border:1px solid var(--bdr)">
+            <div style="font-size:10px;color:var(--muted);margin-bottom:3px">Time to credit</div>
+            <div style="font-size:12px;font-weight:600;color:var(--grn)">11 minutes</div>
+          </div>
+        </div>
+
+        <div class="card-sm" style="margin-bottom:18px;text-align:left">
+          <div style="font-size:12px;font-weight:600;color:var(--sub);margin-bottom:5px">Movement check passed ✓</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.6">Delivery trail verified · Platform activity confirmed · Trust score 84/100</div>
+        </div>
+
+        <div style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6">
+          Since this is a demo, no real money was transferred.<br>
+          In the live product, this goes straight to your UPI.
+        </div>
+
+        <button class="btn" id="btn-back-home">Back to Shield Home</button>
+      </div>
+    </div>`;
+},
+}; // end screens
+
+// ── EVENT BINDING ─────────────────────────────────────────────────
+function bindEvents(){
+  const on = (id, ev, fn) => { const el=document.getElementById(id); if(el) el.addEventListener(ev,fn); };
+  const q  = (sel, fn) => document.querySelectorAll(sel).forEach(fn);
+
+  // SPLASH
+  on("btn-start","click",()=>go(1));
+
+  // OTP
+  on("inp-phone","input",e=>{
+    state.phone = e.target.value.replace(/\D/g,"").slice(0,10);
+    const btn = document.getElementById("btn-sendotp");
+    if(btn) btn.disabled = state.phone.length < 10;
+  });
+  on("btn-sendotp","click",()=>{
+    if(state.phone.length<10) return;
+    const btn=document.getElementById("btn-sendotp");
+    if(btn){ btn.textContent="Sending…"; btn.disabled=true; }
+    setTimeout(()=>{ state.otpSent=true; render(); }, 1100);
+  });
+  q(".otp-c", el=>{
+    el.addEventListener("input",e=>{
+      const i=+el.dataset.idx;
+      state.otp[i]=e.target.value.slice(-1);
+      el.className="otp-c"+(state.otp[i]?" on":"");
+      const next=document.querySelector(`.otp-c[data-idx="${i+1}"]`);
+      if(e.target.value && next) next.focus();
+      if(state.otp.every(d=>d)) setTimeout(()=>go(2),500);
+    });
+    el.addEventListener("keydown",e=>{
+      if(e.key==="Backspace"&&!state.otp[+el.dataset.idx]){
+        const prev=document.querySelector(`.otp-c[data-idx="${+el.dataset.idx-1}"]`);
+        if(prev) prev.focus();
+      }
+    });
+  });
+  on("btn-verifyotp","click",()=>go(2));
+
+  // KYC
+  on("btn-kyc","click",()=>{
+    const a=document.getElementById("inp-aadhaar");
+    const u=document.getElementById("inp-upi");
+    if(!a||!u) return;
+    if(a.value.replace(/\s/g,"").length<12 || u.value.length<5) return;
+    state.upi = u.value;
+    const btn=document.getElementById("btn-kyc");
+    if(btn){ btn.textContent="Checking with UIDAI…"; btn.disabled=true; btn.style.animation="breathe 1s infinite"; }
+    setTimeout(()=>{ state.kycVerified=true; render(); }, 1400);
+  });
+  on("btn-kyc-next","click",()=>{ state.profileStep=1; go(3); });
+
+  // PROFILE
+  q("[data-platform]",el=>{
+    el.addEventListener("click",()=>{
+      state.platform=el.dataset.platform;
+      document.querySelectorAll("[data-platform]").forEach(e=>e.classList.toggle("on",e.dataset.platform===state.platform));
+      const btn=document.getElementById("btn-p1");
+      if(btn) btn.disabled=!state.platform||!state.city;
+    });
+  });
+  on("sel-city","change",e=>{
+    state.city=e.target.value; state.area="";
+    const btn=document.getElementById("btn-p1");
+    if(btn) btn.disabled=!state.platform||!state.city;
+  });
+  on("btn-p1","click",()=>{ if(state.platform&&state.city){ state.profileStep=2; render(); } });
+
+  q("[data-area]",el=>{
+    el.addEventListener("click",()=>{
+      state.area=el.dataset.area;
+      state.riskScore=AREA_RISK[state.area]||55;
+      document.querySelectorAll("[data-area]").forEach(e=>e.classList.toggle("on",e.dataset.area===state.area));
+      const btn=document.getElementById("btn-p2");
+      if(btn) btn.disabled=false;
+      render(); // re-render to show risk card
+    });
+  });
+  on("btn-p2-back","click",()=>{ state.profileStep=1; render(); });
+  on("btn-p2","click",()=>{ if(state.area){ state.profileStep=3; render(); } });
+
+  on("inp-earnings","input",e=>{
+    state.earnings=parseInt(e.target.value)||0;
+    const btn=document.getElementById("btn-p3");
+    if(btn) btn.disabled=!state.earnings||state.earnings<500;
+    render();
+  });
+  on("btn-p3-back","click",()=>{ state.profileStep=2; render(); });
+  on("btn-p3","click",()=>{
+    if(!state.earnings||state.earnings<500) return;
+    calcPricing();
+    // update payout history amounts with actual payout
+    state.payoutHistory = state.payoutHistory.map((h,i)=>({...h,amount:i===2?150:state.payout,area:state.area}));
+    go(4);
+  });
+
+  // QUOTE
+  on("btn-activate","click",()=>{
+    const btn=document.getElementById("btn-activate");
+    if(btn){ btn.textContent="⚡ Activating…"; btn.disabled=true; btn.style.animation="breathe 1s infinite"; }
+    setTimeout(()=>go(5), 1400);
+  });
+
+  // DASHBOARD
+  on("btn-simulate","click",()=>{
+    state.triggerPhase=0;
+    go(6);
+    // auto-advance trigger phases
+    const advance=(ph)=>{
+      if(ph>4) return;
+      state.triggerTimer=setTimeout(()=>{
+        state.triggerPhase=ph;
+        render();
+        advance(ph+1);
+      }, ph===0?1700:ph===1?1500:ph===2?1500:1600);
+    };
+    advance(1);
+  });
+  on("btn-pause","click",()=>{
+    const btn=document.getElementById("btn-pause");
+    if(btn){ btn.textContent="Shield paused for this week ✓"; btn.disabled=true; }
+  });
+
+  // TRIGGER PAYOUT BACK
+  on("btn-back-home","click",()=>{ state.triggerPhase=0; go(5); });
+}
+
+// ── BOOT ─────────────────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>
