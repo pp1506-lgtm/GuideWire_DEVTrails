@@ -1,0 +1,814 @@
+"""
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                     GigShield — Backend Source Code                         ║
+║                                                                              ║
+║  Modules:                                                                    ║
+║    1. Registration Process           — user onboarding, KYC, OTP            ║
+║    2. Insurance Policy Management    — create, update, retrieve policies     ║
+║    3. Dynamic Premium Calculation    — ML-driven pricing engine (Python/     ║
+║                                        scikit-learn gradient boosting)       ║
+║    4. Claims Management              — trigger validation, payout pipeline   ║
+║                                                                              ║
+║  Stack: Python 3.10+, scikit-learn, numpy, pandas, hashlib, uuid, dataclasses
+╚══════════════════════════════════════════════════════════════════════════════╝
+"""
+
+# ─────────────────────────── stdlib ──────────────────────────────────────────
+import hashlib
+import uuid
+import random
+import re
+from datetime import datetime, timedelta
+from dataclasses import dataclass, field
+from typing import Optional
+from enum import Enum
+
+# ─────────────────────────── third-party ─────────────────────────────────────
+import numpy as np
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_absolute_error, r2_score
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SHARED ENUMS & CONSTANTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+class Platform(str, Enum):
+    ZOMATO  = "Zomato"
+    SWIGGY  = "Swiggy"
+    BOTH    = "Both"
+
+class PolicyStatus(str, Enum):
+    ACTIVE   = "active"
+    LAPSED   = "lapsed"
+    CLAIMED  = "claimed"
+    CANCELLED = "cancelled"
+
+class ClaimStatus(str, Enum):
+    PENDING  = "pending"
+    APPROVED = "approved"
+    PAID     = "paid"
+    REJECTED = "rejected"
+
+class TriggerType(str, Enum):
+    HEAVY_RAIN       = "rain"
+    SEVERE_AQI       = "aqi"
+    BANDH            = "bandh"
+    PLATFORM_OUTAGE  = "downtime"
+    EXTREME_HEAT     = "heat"
+
+# Base payout amounts per trigger (₹)
+TRIGGER_PAYOUTS: dict[TriggerType, int] = {
+    TriggerType.HEAVY_RAIN:      350,
+    TriggerType.SEVERE_AQI:      250,
+    TriggerType.BANDH:           400,
+    TriggerType.PLATFORM_OUTAGE: 200,
+    TriggerType.EXTREME_HEAT:    300,
+}
+
+# City-level risk multipliers (higher → higher premium)
+CITY_RISK: dict[str, float] = {
+    "Bengaluru":  1.00,
+    "Mumbai":     1.18,
+    "Delhi NCR":  1.25,
+    "Chennai":    0.95,
+    "Hyderabad":  1.05,
+}
+
+# Area-level risk scores within cities (0–1, higher = riskier)
+AREA_RISK: dict[str, float] = {
+    # Bengaluru
+    "Koramangala": 0.72, "Indiranagar": 0.68, "HSR Layout": 0.60,
+    "Whitefield":  0.55, "Jayanagar":   0.50, "Electronic City": 0.48,
+    # Mumbai
+    "Andheri": 0.80, "Bandra": 0.78, "Kurla": 0.85,
+    "Dharavi": 0.90, "Borivali": 0.62, "Dadar": 0.75,
+    # Delhi NCR
+    "Connaught Place": 0.88, "Rohini": 0.70, "Dwarka": 0.65,
+    "Noida Sec 18":    0.72, "Gurgaon": 0.68, "Saket": 0.60,
+    # Chennai
+    "T. Nagar": 0.65, "Adyar": 0.55, "Velachery": 0.58,
+    "Anna Nagar": 0.60, "OMR": 0.52, "Tambaram": 0.48,
+    # Hyderabad
+    "Banjara Hills": 0.62, "Hitech City": 0.58, "Gachibowli": 0.55,
+    "Ameerpet": 0.70, "Secunderabad": 0.72, "Kukatpally": 0.65,
+}
+
+# In-memory data stores (replace with DB calls in production)
+_users_db:    dict[str, "User"]   = {}
+_policies_db: dict[str, "Policy"] = {}
+_claims_db:   dict[str, "Claim"]  = {}
+_otps_db:     dict[str, str]      = {}  # phone → OTP (expires in real impl)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MODULE 1 — REGISTRATION PROCESS
+# ══════════════════════════════════════════════════════════════════════════════
+
+@dataclass
+class User:
+    id:           str
+    name:         str
+    phone:        str            # 10-digit, E.164 normalised
+    upi_id:       str
+    aadhaar_hash: str            # SHA-256 of raw Aadhaar; raw number is NEVER stored
+    platform:     Platform
+    city:         str
+    area:         str
+    avg_weekly_earnings: float   # ₹
+    tenure_months: int           # months on platform
+    kyc_verified:  bool = False
+    created_at:    datetime = field(default_factory=datetime.utcnow)
+    policy_id:     Optional[str] = None
+
+
+class RegistrationError(Exception):
+    pass
+
+
+class RegistrationManager:
+    """
+    Handles gig-worker onboarding:
+      Step 1 — Phone + name capture  → send OTP
+      Step 2 — OTP verification
+      Step 3 — Aadhaar KYC + UPI linking
+      Step 4 — Profile (platform, city, area, earnings)
+      Step 5 — Commit user to DB
+    """
+
+    # ── Step 1: initiate OTP ──────────────────────────────────────────────────
+    @staticmethod
+    def send_otp(phone: str) -> str:
+        """
+        Validates phone format, generates a 6-digit OTP, stores it keyed by
+        phone (in production: send via SMS gateway e.g. Twilio / MSG91).
+        Returns the OTP (demo only — in prod this would be opaque).
+        """
+        phone = phone.strip().replace(" ", "")
+        if not re.fullmatch(r"[6-9]\d{9}", phone):
+            raise RegistrationError("Invalid Indian mobile number.")
+
+        otp = str(random.randint(100000, 999999))
+        _otps_db[phone] = otp
+        # In production: send_sms(phone, f"Your GigShield OTP is {otp}. Valid for 5 min.")
+        print(f"[OTP] Sent {otp} to +91-{phone}")
+        return otp
+
+    # ── Step 2: verify OTP ───────────────────────────────────────────────────
+    @staticmethod
+    def verify_otp(phone: str, entered_otp: str) -> bool:
+        """
+        Checks the entered OTP against the stored value.
+        In production: also enforce expiry timestamp (5 minutes).
+        """
+        stored = _otps_db.get(phone)
+        if not stored:
+            raise RegistrationError("OTP not found or expired. Request a new one.")
+        if stored != entered_otp.strip():
+            raise RegistrationError("Incorrect OTP.")
+        del _otps_db[phone]        # one-time use
+        return True
+
+    # ── Step 3: KYC verification ──────────────────────────────────────────────
+    @staticmethod
+    def verify_kyc(aadhaar_raw: str, upi_id: str) -> str:
+        """
+        Validates Aadhaar format and UPI ID.
+        Hashes the Aadhaar with SHA-256 (raw number is immediately discarded).
+        Returns the hash to store against the user record.
+
+        In production: call UIDAI OTP-based e-KYC API or DigiLocker API.
+        Enforce one-policy-per-Aadhaar uniqueness using the hash.
+        """
+        # Validate Aadhaar (12 digits, Luhn-like Verhoeff check skipped for brevity)
+        aadhaar_clean = aadhaar_raw.replace(" ", "").replace("-", "")
+        if not re.fullmatch(r"\d{12}", aadhaar_clean):
+            raise RegistrationError("Aadhaar must be exactly 12 digits.")
+        if not aadhaar_clean[0] in "23456789":     # VID/Aadhaar starts 2–9
+            raise RegistrationError("Invalid Aadhaar number.")
+
+        # Validate UPI (must contain @)
+        if "@" not in upi_id or len(upi_id) < 5:
+            raise RegistrationError("Invalid UPI ID — must contain '@'.")
+
+        # Check for duplicate KYC
+        aadhaar_hash = hashlib.sha256(aadhaar_clean.encode()).hexdigest()
+        for existing in _users_db.values():
+            if existing.aadhaar_hash == aadhaar_hash:
+                raise RegistrationError("An account already exists for this Aadhaar.")
+
+        return aadhaar_hash
+
+    # ── Step 4 + 5: create user record ───────────────────────────────────────
+    @staticmethod
+    def create_user(
+        name:              str,
+        phone:             str,
+        upi_id:            str,
+        aadhaar_hash:      str,
+        platform:          Platform,
+        city:              str,
+        area:              str,
+        avg_weekly_earnings: float,
+        tenure_months:     int = 6,
+    ) -> User:
+        """
+        Commits a verified user to the data store.
+        """
+        if city not in CITY_RISK:
+            raise RegistrationError(f"Unsupported city: {city}")
+        if avg_weekly_earnings < 500:
+            raise RegistrationError("Minimum reportable earnings are ₹500/week.")
+        if tenure_months < 1:
+            raise RegistrationError("Minimum platform tenure is 1 month.")
+
+        user = User(
+            id=str(uuid.uuid4()),
+            name=name.strip(),
+            phone=phone,
+            upi_id=upi_id.strip(),
+            aadhaar_hash=aadhaar_hash,
+            platform=platform,
+            city=city,
+            area=area,
+            avg_weekly_earnings=float(avg_weekly_earnings),
+            tenure_months=int(tenure_months),
+            kyc_verified=True,
+        )
+        _users_db[user.id] = user
+        print(f"[Registration] User '{user.name}' registered — ID: {user.id}")
+        return user
+
+    @staticmethod
+    def get_user(user_id: str) -> User:
+        user = _users_db.get(user_id)
+        if not user:
+            raise RegistrationError(f"User '{user_id}' not found.")
+        return user
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MODULE 2 — INSURANCE POLICY MANAGEMENT
+# ══════════════════════════════════════════════════════════════════════════════
+
+@dataclass
+class Policy:
+    id:            str
+    user_id:       str
+    status:        PolicyStatus
+    weekly_premium: float        # ₹ — ML-computed
+    city:          str
+    area:          str
+    platform:      Platform
+    trigger_coverage: list[TriggerType]
+    start_date:    datetime
+    next_renewal:  datetime
+    total_claimed: float = 0.0
+    claim_count:   int   = 0
+    created_at:    datetime = field(default_factory=datetime.utcnow)
+
+
+class PolicyError(Exception):
+    pass
+
+
+class PolicyManager:
+    """
+    Manages the full lifecycle of a GigShield insurance policy:
+      • Creation  — issued after successful registration + premium quote
+      • Renewal   — weekly AutoPay (UPI Mandate)
+      • Suspension / Cancellation
+      • Retrieval / status check
+    """
+
+    @staticmethod
+    def create_policy(user: User, weekly_premium: float) -> Policy:
+        """
+        Issues a new policy for a verified user with an ML-computed premium.
+        """
+        if not user.kyc_verified:
+            raise PolicyError("Cannot issue policy without successful KYC.")
+        if user.policy_id:
+            existing = _policies_db.get(user.policy_id)
+            if existing and existing.status == PolicyStatus.ACTIVE:
+                raise PolicyError("User already has an active policy.")
+
+        now = datetime.utcnow()
+        policy = Policy(
+            id=f"POL-{uuid.uuid4().hex[:10].upper()}",
+            user_id=user.id,
+            status=PolicyStatus.ACTIVE,
+            weekly_premium=round(weekly_premium, 2),
+            city=user.city,
+            area=user.area,
+            platform=user.platform,
+            trigger_coverage=list(TriggerType),   # all 5 triggers covered
+            start_date=now,
+            next_renewal=now + timedelta(weeks=1),
+        )
+        _policies_db[policy.id] = policy
+        user.policy_id = policy.id
+        print(f"[Policy] Created {policy.id} for user {user.id} "
+              f"@ ₹{policy.weekly_premium}/week")
+        return policy
+
+    @staticmethod
+    def get_policy(policy_id: str) -> Policy:
+        policy = _policies_db.get(policy_id)
+        if not policy:
+            raise PolicyError(f"Policy '{policy_id}' not found.")
+        return policy
+
+    @staticmethod
+    def renew_policy(policy_id: str) -> Policy:
+        """
+        Processes weekly renewal via UPI AutoPay.
+        In production: call Razorpay / PayU UPI Mandate charge API.
+        """
+        policy = PolicyManager.get_policy(policy_id)
+        if policy.status != PolicyStatus.ACTIVE:
+            raise PolicyError(f"Cannot renew a {policy.status.value} policy.")
+
+        policy.next_renewal = datetime.utcnow() + timedelta(weeks=1)
+        print(f"[Policy] Renewed {policy_id} — next renewal: {policy.next_renewal.date()}")
+        return policy
+
+    @staticmethod
+    def cancel_policy(policy_id: str, reason: str = "") -> Policy:
+        policy = PolicyManager.get_policy(policy_id)
+        policy.status = PolicyStatus.CANCELLED
+        print(f"[Policy] Cancelled {policy_id}. Reason: {reason or 'N/A'}")
+        return policy
+
+    @staticmethod
+    def lapse_policy(policy_id: str) -> Policy:
+        """Called when AutoPay fails (payment declined)."""
+        policy = PolicyManager.get_policy(policy_id)
+        policy.status = PolicyStatus.LAPSED
+        print(f"[Policy] Lapsed {policy_id} — payment failure.")
+        return policy
+
+    @staticmethod
+    def get_policy_summary(policy_id: str) -> dict:
+        p = PolicyManager.get_policy(policy_id)
+        user = _users_db.get(p.user_id, None)
+        return {
+            "policy_id":       p.id,
+            "user_name":       user.name if user else "—",
+            "status":          p.status.value,
+            "weekly_premium":  f"₹{p.weekly_premium}",
+            "city":            p.city,
+            "area":            p.area,
+            "platform":        p.platform.value,
+            "triggers_covered": [t.value for t in p.trigger_coverage],
+            "total_claimed":   f"₹{p.total_claimed}",
+            "claim_count":     p.claim_count,
+            "start_date":      str(p.start_date.date()),
+            "next_renewal":    str(p.next_renewal.date()),
+        }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MODULE 3 — DYNAMIC PREMIUM CALCULATION (MACHINE LEARNING)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class PremiumEngine:
+    """
+    Gradient-Boosting Regressor that predicts the weekly insurance premium
+    for a gig worker based on risk features.
+
+    Features used:
+      • platform_encoded     — Zomato=0, Swiggy=1, Both=2
+      • city_risk            — from CITY_RISK lookup
+      • area_risk            — from AREA_RISK lookup  (0–1 float)
+      • log_weekly_earnings  — log(₹ earnings) to compress scale
+      • tenure_months        — months on platform (experience proxy)
+      • historical_claims    — prior claim count (underwriting signal)
+
+    Target: weekly_premium (₹)
+
+    Training data: synthetically generated in _generate_training_data()
+    In production: replace with real policy/claim records from your DB.
+    """
+
+    BASE_PREMIUM = 49.0          # ₹ floor — never go below this
+    PLATFORM_MAP = {Platform.ZOMATO: 0, Platform.SWIGGY: 1, Platform.BOTH: 2}
+
+    def __init__(self):
+        self.model   = GradientBoostingRegressor(
+            n_estimators=300,
+            max_depth=4,
+            learning_rate=0.05,
+            subsample=0.8,
+            random_state=42,
+        )
+        self.scaler  = StandardScaler()
+        self._trained = False
+        self._train()
+
+    # ── Synthetic training data ───────────────────────────────────────────────
+    def _generate_training_data(self, n: int = 3000) -> pd.DataFrame:
+        """
+        Generates synthetic training examples that reflect realistic pricing
+        logic. Premium rises with:
+          • higher city/area risk
+          • lower earnings (more exposed to income shocks)
+          • fewer months on platform (less experienced)
+          • more past claims (adverse selection)
+        """
+        rng = np.random.default_rng(seed=7)
+        cities   = list(CITY_RISK.keys())
+        platforms = list(Platform)
+
+        rows = []
+        for _ in range(n):
+            city     = rng.choice(cities)
+            areas    = [a for a in AREA_RISK if a in
+                        {k for k, v in AREA_RISK.items()}]
+            area     = rng.choice(list(AREA_RISK.keys()))
+            plat     = rng.choice(platforms)
+            earnings = rng.uniform(2000, 18000)
+            tenure   = int(rng.integers(1, 84))         # 1–84 months
+            claims   = int(rng.integers(0, 6))
+
+            cr   = CITY_RISK.get(city, 1.0)
+            ar   = AREA_RISK.get(area, 0.6)
+            pval = self.PLATFORM_MAP[plat]
+
+            # Deterministic premium formula (used only to label training data)
+            base  = self.BASE_PREMIUM
+            risk  = cr * (1 + ar)
+            earn_factor   = max(0.6, 1 - np.log1p(earnings) / np.log1p(18000) * 0.4)
+            tenure_factor = max(0.7, 1 - tenure / 84 * 0.3)
+            claim_factor  = 1 + claims * 0.12
+
+            premium = base * risk * earn_factor * tenure_factor * claim_factor
+            premium += rng.normal(0, 3)               # add noise
+            premium = max(self.BASE_PREMIUM, premium)
+
+            rows.append({
+                "platform_encoded":    pval,
+                "city_risk":           cr,
+                "area_risk":           ar,
+                "log_weekly_earnings": np.log1p(earnings),
+                "tenure_months":       tenure,
+                "historical_claims":   claims,
+                "weekly_premium":      round(premium, 2),
+            })
+
+        return pd.DataFrame(rows)
+
+    # ── Model training ────────────────────────────────────────────────────────
+    def _train(self):
+        df = self._generate_training_data()
+        feature_cols = [
+            "platform_encoded", "city_risk", "area_risk",
+            "log_weekly_earnings", "tenure_months", "historical_claims",
+        ]
+        X = df[feature_cols].values
+        y = df["weekly_premium"].values
+
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.2, random_state=42
+        )
+
+        X_train_s = self.scaler.fit_transform(X_train)
+        X_test_s  = self.scaler.transform(X_test)
+
+        self.model.fit(X_train_s, y_train)
+        y_pred = self.model.predict(X_test_s)
+
+        mae = mean_absolute_error(y_test, y_pred)
+        r2  = r2_score(y_test, y_pred)
+        print(f"[PremiumEngine] Model trained — MAE: ₹{mae:.2f} | R²: {r2:.4f}")
+        self._trained = True
+
+    # ── Prediction ────────────────────────────────────────────────────────────
+    def predict(
+        self,
+        platform:      Platform,
+        city:          str,
+        area:          str,
+        avg_weekly_earnings: float,
+        tenure_months: int       = 6,
+        historical_claims: int   = 0,
+    ) -> float:
+        """
+        Returns the ML-predicted weekly premium (₹), floored at BASE_PREMIUM.
+        All six features are extracted, scaled, then passed to the GBR model.
+        """
+        if not self._trained:
+            raise RuntimeError("Model not trained yet.")
+
+        city_risk  = CITY_RISK.get(city, 1.0)
+        area_risk  = AREA_RISK.get(area, 0.6)
+        plat_enc   = self.PLATFORM_MAP.get(platform, 0)
+        log_earn   = np.log1p(avg_weekly_earnings)
+
+        X = np.array([[plat_enc, city_risk, area_risk,
+                       log_earn, tenure_months, historical_claims]])
+        X_s = self.scaler.transform(X)
+
+        raw_premium = float(self.model.predict(X_s)[0])
+        premium     = max(self.BASE_PREMIUM, round(raw_premium, 2))
+
+        print(f"[PremiumEngine] Predicted premium: ₹{premium} "
+              f"({platform.value}, {area}, {city})")
+        return premium
+
+    def feature_importances(self) -> pd.Series:
+        """Returns which features drive the premium most."""
+        cols = ["platform_encoded", "city_risk", "area_risk",
+                "log_weekly_earnings", "tenure_months", "historical_claims"]
+        return pd.Series(
+            self.model.feature_importances_, index=cols
+        ).sort_values(ascending=False)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MODULE 4 — CLAIMS MANAGEMENT
+# ══════════════════════════════════════════════════════════════════════════════
+
+@dataclass
+class ActiveTrigger:
+    trigger_type:  TriggerType
+    activated_at:  datetime
+    activated_by:  str          # admin user ID or "system"
+    deactivated_at: Optional[datetime] = None
+
+
+@dataclass
+class Claim:
+    id:             str
+    policy_id:      str
+    user_id:        str
+    trigger_type:   TriggerType
+    amount:         float        # ₹ payout
+    status:         ClaimStatus
+    upi_id:         str          # destination for payout
+    submitted_at:   datetime
+    processed_at:   Optional[datetime] = None
+    rejection_reason: Optional[str]    = None
+
+
+# Global active-trigger registry (admin-controlled in the UI)
+_active_triggers: dict[TriggerType, ActiveTrigger] = {}
+
+
+class ClaimsError(Exception):
+    pass
+
+
+class TriggerManager:
+    """Allows admins to activate / deactivate triggers."""
+
+    @staticmethod
+    def activate(trigger: TriggerType, admin_id: str = "admin"):
+        _active_triggers[trigger] = ActiveTrigger(
+            trigger_type=trigger,
+            activated_at=datetime.utcnow(),
+            activated_by=admin_id,
+        )
+        print(f"[Trigger] ACTIVATED: {trigger.value} by {admin_id}")
+
+    @staticmethod
+    def deactivate(trigger: TriggerType):
+        if trigger in _active_triggers:
+            _active_triggers[trigger].deactivated_at = datetime.utcnow()
+            del _active_triggers[trigger]
+            print(f"[Trigger] DEACTIVATED: {trigger.value}")
+
+    @staticmethod
+    def deactivate_all():
+        for t in list(_active_triggers.keys()):
+            TriggerManager.deactivate(t)
+
+    @staticmethod
+    def get_active() -> list[ActiveTrigger]:
+        return list(_active_triggers.values())
+
+    @staticmethod
+    def is_active(trigger: TriggerType) -> bool:
+        return trigger in _active_triggers
+
+
+class ClaimsManager:
+    """
+    End-to-end claims pipeline:
+      1. submit_claim   — validates eligibility, creates Claim record
+      2. process_claim  — simulates UPI payout & marks claim PAID
+      3. reject_claim   — admin/system rejection with reason
+      4. get_history    — per-user claim history
+    """
+
+    COOLDOWN_HOURS = 1       # same trigger cannot be claimed twice within 1h
+
+    # ── Eligibility check ─────────────────────────────────────────────────────
+    @staticmethod
+    def _check_eligibility(user: User, policy: Policy, trigger: TriggerType):
+        # 1. Policy must be active
+        if policy.status != PolicyStatus.ACTIVE:
+            raise ClaimsError(f"Policy is {policy.status.value} — not eligible.")
+
+        # 2. Trigger must be currently active (admin-fired)
+        if not TriggerManager.is_active(trigger):
+            raise ClaimsError(f"Trigger '{trigger.value}' is not currently active.")
+
+        # 3. Trigger must be in policy's coverage list
+        if trigger not in policy.trigger_coverage:
+            raise ClaimsError(f"Trigger '{trigger.value}' is not covered by this policy.")
+
+        # 4. Cooldown — no repeat claim for same trigger within cooldown window
+        cutoff = datetime.utcnow() - timedelta(hours=ClaimsManager.COOLDOWN_HOURS)
+        recent = [
+            c for c in _claims_db.values()
+            if c.user_id == user.id
+            and c.trigger_type == trigger
+            and c.submitted_at > cutoff
+            and c.status != ClaimStatus.REJECTED
+        ]
+        if recent:
+            raise ClaimsError(
+                f"Already claimed '{trigger.value}' within "
+                f"the last {ClaimsManager.COOLDOWN_HOURS}h."
+            )
+
+    # ── Submit ────────────────────────────────────────────────────────────────
+    @staticmethod
+    def submit_claim(
+        user_id:      str,
+        policy_id:    str,
+        trigger:      TriggerType,
+    ) -> Claim:
+        """
+        Validates all eligibility conditions and creates an APPROVED claim.
+        In production, this would be queued for async payout processing.
+        """
+        user   = _users_db.get(user_id)
+        policy = _policies_db.get(policy_id)
+
+        if not user:
+            raise ClaimsError(f"User '{user_id}' not found.")
+        if not policy:
+            raise ClaimsError(f"Policy '{policy_id}' not found.")
+
+        ClaimsManager._check_eligibility(user, policy, trigger)
+
+        payout = TRIGGER_PAYOUTS[trigger]
+        claim  = Claim(
+            id=f"CLM-{uuid.uuid4().hex[:8].upper()}",
+            policy_id=policy_id,
+            user_id=user_id,
+            trigger_type=trigger,
+            amount=payout,
+            status=ClaimStatus.APPROVED,
+            upi_id=user.upi_id,
+            submitted_at=datetime.utcnow(),
+        )
+        _claims_db[claim.id] = claim
+
+        print(f"[Claim] Submitted {claim.id} — ₹{payout} for "
+              f"'{trigger.value}' → {user.upi_id}")
+        return claim
+
+    # ── Process (payout) ──────────────────────────────────────────────────────
+    @staticmethod
+    def process_claim(claim_id: str) -> Claim:
+        """
+        Executes the UPI payout.
+        In production: call Razorpay / NPCI UPI payout API, handle webhook.
+        """
+        claim  = _claims_db.get(claim_id)
+        if not claim:
+            raise ClaimsError(f"Claim '{claim_id}' not found.")
+        if claim.status != ClaimStatus.APPROVED:
+            raise ClaimsError(f"Claim is {claim.status.value}, cannot process.")
+
+        # Simulate UPI transfer
+        claim.status       = ClaimStatus.PAID
+        claim.processed_at = datetime.utcnow()
+
+        # Update policy totals
+        policy = _policies_db.get(claim.policy_id)
+        if policy:
+            policy.total_claimed += claim.amount
+            policy.claim_count   += 1
+
+        print(f"[Claim] PAID {claim_id} — ₹{claim.amount} → {claim.upi_id}")
+        return claim
+
+    # ── Reject ────────────────────────────────────────────────────────────────
+    @staticmethod
+    def reject_claim(claim_id: str, reason: str) -> Claim:
+        claim = _claims_db.get(claim_id)
+        if not claim:
+            raise ClaimsError(f"Claim '{claim_id}' not found.")
+        claim.status           = ClaimStatus.REJECTED
+        claim.rejection_reason = reason
+        claim.processed_at     = datetime.utcnow()
+        print(f"[Claim] REJECTED {claim_id} — {reason}")
+        return claim
+
+    # ── History ───────────────────────────────────────────────────────────────
+    @staticmethod
+    def get_user_claims(user_id: str) -> list[Claim]:
+        return sorted(
+            [c for c in _claims_db.values() if c.user_id == user_id],
+            key=lambda c: c.submitted_at, reverse=True,
+        )
+
+    @staticmethod
+    def get_all_claims() -> list[Claim]:
+        return sorted(_claims_db.values(), key=lambda c: c.submitted_at, reverse=True)
+
+    @staticmethod
+    def admin_summary() -> dict:
+        all_claims = list(_claims_db.values())
+        paid   = [c for c in all_claims if c.status == ClaimStatus.PAID]
+        return {
+            "total_claims":   len(all_claims),
+            "total_paid_inr": sum(c.amount for c in paid),
+            "paid_count":     len(paid),
+            "active_triggers": [t.value for t in _active_triggers],
+        }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DEMO — end-to-end walkthrough of all four modules
+# ══════════════════════════════════════════════════════════════════════════════
+
+if __name__ == "__main__":
+    print("\n" + "═"*60)
+    print("  GigShield — End-to-End Demo")
+    print("═"*60 + "\n")
+
+    # ── 1. Premium Engine (trains on startup) ─────────────────────────────────
+    engine = PremiumEngine()
+    print("\nFeature importances:")
+    print(engine.feature_importances().to_string())
+
+    # ── 2. Registration ───────────────────────────────────────────────────────
+    rm   = RegistrationManager()
+    otp  = rm.send_otp("9876543210")
+    rm.verify_otp("9876543210", otp)
+
+    a_hash = rm.verify_kyc("2345 6789 0123", "ravi@phonepe")
+
+    user = rm.create_user(
+        name="Ravi Kumar",
+        phone="9876543210",
+        upi_id="ravi@phonepe",
+        aadhaar_hash=a_hash,
+        platform=Platform.ZOMATO,
+        city="Bengaluru",
+        area="Koramangala",
+        avg_weekly_earnings=4500,
+        tenure_months=14,
+    )
+
+    # ── 3. Dynamic Premium ────────────────────────────────────────────────────
+    premium = engine.predict(
+        platform=user.platform,
+        city=user.city,
+        area=user.area,
+        avg_weekly_earnings=user.avg_weekly_earnings,
+        tenure_months=user.tenure_months,
+        historical_claims=0,
+    )
+
+    # ── 4. Policy issuance ────────────────────────────────────────────────────
+    pm     = PolicyManager()
+    policy = pm.create_policy(user, weekly_premium=premium)
+    print("\nPolicy Summary:")
+    for k, v in pm.get_policy_summary(policy.id).items():
+        print(f"  {k:<22}: {v}")
+
+    # ── 5. Admin fires a trigger ──────────────────────────────────────────────
+    print()
+    TriggerManager.activate(TriggerType.HEAVY_RAIN, admin_id="admin-01")
+    TriggerManager.activate(TriggerType.BANDH,      admin_id="admin-01")
+
+    # ── 6. User submits & processes a claim ───────────────────────────────────
+    cm    = ClaimsManager()
+    claim = cm.submit_claim(user.id, policy.id, TriggerType.HEAVY_RAIN)
+    cm.process_claim(claim.id)
+
+    claim2 = cm.submit_claim(user.id, policy.id, TriggerType.BANDH)
+    cm.process_claim(claim2.id)
+
+    # ── 7. Admin summary ──────────────────────────────────────────────────────
+    print("\nAdmin Summary:")
+    for k, v in cm.admin_summary().items():
+        print(f"  {k:<22}: {v}")
+
+    print("\nUser Claim History:")
+    for c in cm.get_user_claims(user.id):
+        print(f"  {c.id}  {c.trigger_type.value:<12}  ₹{c.amount}"
+              f"  [{c.status.value.upper()}]  → {c.upi_id}")
+
+    print("\n" + "═"*60)
+    print("  Demo complete.")
+    print("═"*60 + "\n")
