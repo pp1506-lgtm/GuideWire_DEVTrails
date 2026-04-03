@@ -834,7 +834,4 @@ At 100,000 workers → ~₹80M annual net contribution
 - Poor UX loading a web app on a 4G connection during an active rainstorm
 
 ---
-
-*Submission by: [Your Team Name] | DEVTrails 2026 | Guidewire University Hackathon | Phase 1 Deadline: March 20, 2026*
-
-*Built with ❤️ for India's 12 million gig workers*
+Submission by Bug Busters 
