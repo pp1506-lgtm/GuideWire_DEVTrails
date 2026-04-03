@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>GigShield — Trigger-Based Insurance</title>
+<meta name="description" content="Income protection for gig workers with trigger-based automatic payouts"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#0B0F1A;--surf:#131929;--card:#1A2236;--bdr:#1f2e47;
+  --acc:#F97316;--accg:rgba(249,115,22,.12);
+  --grn:#22C55E;--grng:rgba(34,197,94,.12);
+  --yel:#F59E0B;--yelg:rgba(245,158,11,.12);
+  --red:#EF4444;--redg:rgba(239,68,68,.12);
+  --blu:#3B82F6;--blug:rgba(59,130,246,.12);
+  --pur:#A855F7;--purg:rgba(168,85,247,.12);
+  --txt:#EEF2FF;--sub:#8B9CC8;--muted:#44547A;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--txt);font-family:'Instrument Sans',sans-serif;display:flex;align-items:center;justify-content:center}
+.jak{font-family:'Plus Jakarta Sans',sans-serif}
+
+/* SHELL */
+.app-wrap{display:flex;flex-direction:column;align-items:center;gap:18px}
+.shell{width:390px;height:844px;background:var(--surf);border-radius:50px;border:1.5px solid var(--bdr);overflow:hidden;position:relative;flex-shrink:0;box-shadow:0 40px 100px rgba(0,0,0,.85),0 0 0 1px rgba(255,255,255,.03) inset,inset 0 1px 0 rgba(255,255,255,.05)}
+.island{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:126px;height:34px;background:#000;border-radius:20px;z-index:20}
+.scr{width:100%;height:100%;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;padding-top:56px}
+.scr::-webkit-scrollbar{display:none}
+.dot-nav{display:flex;gap:7px;align-items:center;justify-content:center;margin-top:18px}
+.dot{height:8px;border-radius:4px;cursor:pointer;transition:all .25s ease}
+
+/* TOAST */
+#toast-wrap{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none;width:350px}
+.toast{padding:12px 16px;border-radius:14px;font-size:13px;font-weight:500;animation:toastIn .3s ease both;pointer-events:auto;display:flex;gap:10px;align-items:flex-start;border:1px solid}
+@keyframes toastIn{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:translateY(0)}}
+.toast-out{animation:toastOut .25s ease both}
+@keyframes toastOut{to{opacity:0;transform:translateY(-8px)}}
+.toast-ok{background:var(--grng);border-color:rgba(34,197,94,.3);color:var(--grn)}
+.toast-warn{background:var(--yelg);border-color:rgba(245,158,11,.3);color:var(--yel)}
+.toast-bad{background:var(--redg);border-color:rgba(239,68,68,.3);color:var(--red)}
+.toast-info{background:var(--card);border-color:var(--bdr);color:var(--txt)}
+
+/* SHARED UI */
+.sbar{display:flex;justify-content:space-between;align-items:center;padding:0 26px 4px;font-size:12px;font-weight:600;color:var(--sub)}
+.prog-wrap{height:3px;background:var(--bdr);border-radius:3px;overflow:hidden;margin-bottom:20px}
+.prog-bar{height:100%;background:var(--acc);border-radius:3px;transition:width .5s ease}
+.card{background:var(--card);border:1px solid var(--bdr);border-radius:18px;padding:18px}
+.card-sm{background:var(--card);border:1px solid var(--bdr);border-radius:14px;padding:14px}
+.div{height:1px;background:var(--bdr)}
+.lbl{font-size:11px;color:var(--sub);font-weight:600;letter-spacing:.6px;text-transform:uppercase;margin-bottom:6px;display:block}
+.hint{font-size:12px;color:var(--muted);margin-top:5px}
+.pill{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600}
+
+.fld{width:100%;padding:13px 15px;background:var(--card);border:1px solid var(--bdr);border-radius:12px;color:var(--txt);font-size:15px;font-family:'Instrument Sans',sans-serif;outline:none;transition:border-color .2s;-webkit-appearance:none;appearance:none}
+.fld:focus{border-color:var(--acc)}
+.fld::placeholder{color:var(--muted)}
+
+.btn{width:100%;padding:15px;background:var(--acc);color:#fff;border:none;border-radius:14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:700;cursor:pointer;transition:all .18s}
+.btn:hover{background:#e8640a;transform:translateY(-1px);box-shadow:0 10px 28px rgba(249,115,22,.28)}
+.btn:active{transform:translateY(0);box-shadow:none}
+.btn:disabled{opacity:.38;cursor:not-allowed;transform:none!important;box-shadow:none!important}
+.btn-ghost{width:100%;padding:14px;background:transparent;color:var(--sub);border:1px solid var(--bdr);border-radius:14px;font-family:'Instrument Sans',sans-serif;font-size:14px;cursor:pointer;transition:all .18s}
+.btn-ghost:hover{border-color:var(--muted);color:var(--txt)}
+.btn-sm{padding:7px 14px;background:var(--acc);color:#fff;border:none;border-radius:9px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:all .18s}
+.btn-sm:hover{background:#e8640a}
+.btn-sm-ghost{padding:7px 14px;background:transparent;color:var(--sub);border:1px solid var(--bdr);border-radius:9px;font-family:'Instrument Sans',sans-serif;font-size:12px;cursor:pointer;transition:all .18s}
+.btn-sm-ghost:hover{border-color:var(--acc);color:var(--acc)}
+.btn-grn{width:100%;padding:15px;background:var(--grn);color:#fff;border:none;border-radius:14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:700;cursor:pointer;transition:all .18s}
+.btn-grn:hover{background:#1aae4f;transform:translateY(-1px);box-shadow:0 10px 28px rgba(34,197,94,.28)}
+.btn-grn:active{transform:translateY(0)}
+.btn-grn:disabled{opacity:.38;cursor:not-allowed;transform:none!important;box-shadow:none!important}
+.btn-red{width:100%;padding:15px;background:var(--red);color:#fff;border:none;border-radius:14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:700;cursor:pointer;transition:all .18s}
+.btn-red:hover{background:#dc3030}
+
+.seg-row{display:flex;gap:8px}
+.seg{flex:1;padding:13px 6px;background:var(--card);border:1.5px solid var(--bdr);border-radius:14px;cursor:pointer;transition:all .18s;display:flex;flex-direction:column;align-items:center;gap:6px}
+.seg.on{border-color:var(--acc);background:var(--accg)}
+.seg.on .slbl{color:var(--acc)}
+.slbl{font-size:11px;font-weight:600;color:var(--sub)}
+.area-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.area-tile{padding:10px 12px;background:var(--card);border:1.5px solid var(--bdr);border-radius:11px;cursor:pointer;transition:all .15s;font-size:13px;color:var(--sub);text-align:left;font-family:'Instrument Sans',sans-serif}
+.area-tile:hover{border-color:var(--muted);color:var(--txt)}
+.area-tile.on{border-color:var(--acc);background:var(--accg);color:var(--acc);font-weight:600}
+.otp-row{display:flex;gap:8px;justify-content:center}
+.otp-c{width:48px;height:56px;background:var(--card);border:1.5px solid var(--bdr);border-radius:11px;text-align:center;font-size:20px;font-weight:700;color:var(--txt);font-family:'Plus Jakarta Sans',sans-serif;outline:none;caret-color:var(--acc);transition:border-color .18s}
+.otp-c:focus,.otp-c.on{border-color:var(--acc);background:var(--accg)}
+
+/* BOTTOM NAV */
+.bnav{position:absolute;bottom:0;left:0;right:0;background:var(--surf);border-top:1px solid var(--bdr);display:flex;padding:8px 0 20px}
+.bnav-btn{flex:1;background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;transition:color .15s}
+.bnav-lbl{font-size:8px;font-weight:700;letter-spacing:.4px;text-transform:uppercase}
+
+/* TRIGGER CARDS */
+.trig-card{padding:14px;border-radius:14px;border:1.5px solid var(--bdr);background:var(--card);margin-bottom:10px;transition:all .3s;cursor:pointer}
+.trig-card.active{border-color:var(--red);background:var(--redg);animation:trigPulse 2s infinite}
+.trig-card .trig-head{display:flex;justify-content:space-between;align-items:center}
+.trig-card .trig-body{margin-top:8px;font-size:12px;color:var(--sub);line-height:1.5}
+@keyframes trigPulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0)}50%{box-shadow:0 0 16px 2px rgba(239,68,68,.15)}}
+
+/* TOGGLE */
+.toggle-wrap{position:relative;width:48px;height:26px;flex-shrink:0}
+.toggle-input{opacity:0;width:0;height:0;position:absolute}
+.toggle-track{position:absolute;inset:0;background:var(--bdr);border-radius:13px;cursor:pointer;transition:background .25s}
+.toggle-input:checked+.toggle-track{background:var(--grn)}
+.toggle-knob{position:absolute;top:3px;left:3px;width:20px;height:20px;background:#fff;border-radius:50%;transition:transform .25s;pointer-events:none}
+.toggle-input:checked~.toggle-knob{transform:translateX(22px)}
+
+/* CLAIM ROW */
+.claim-item{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--bdr)}
+.claim-item:last-child{border-bottom:none}
+
+/* BADGE */
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700}
+.badge-g{background:var(--grng);color:var(--grn);border:1px solid rgba(34,197,94,.3)}
+.badge-y{background:var(--yelg);color:var(--yel);border:1px solid rgba(245,158,11,.3)}
+.badge-r{background:var(--redg);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+.badge-b{background:var(--blug);color:var(--blu);border:1px solid rgba(59,130,246,.3)}
+.badge-p{background:var(--purg);color:var(--pur);border:1px solid rgba(168,85,247,.3)}
+
+/* ADMIN TRIGGER PANEL */
+.admin-trig{display:flex;align-items:center;gap:12px;padding:14px;background:var(--surf);border:1px solid var(--bdr);border-radius:14px;margin-bottom:10px;transition:all .25s}
+.admin-trig.on{border-color:var(--red);background:rgba(239,68,68,.06)}
+.admin-trig .at-icon{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.admin-trig .at-info{flex:1;min-width:0}
+.admin-trig .at-label{font-size:13px;font-weight:600}
+.admin-trig .at-sub{font-size:11px;color:var(--muted);margin-top:1px}
+.admin-trig .at-payout{font-size:12px;font-weight:700;color:var(--grn);margin-top:3px}
+
+/* INNER SCROLL */
+.inner-scroll{overflow-y:auto;scrollbar-width:none}
+.inner-scroll::-webkit-scrollbar{display:none}
+
+/* ANIMATIONS */
+@keyframes up{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes breathe{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes ripple{0%{transform:scale(1);opacity:.5}100%{transform:scale(2.8);opacity:0}}
+@keyframes pop{0%{transform:scale(.3);opacity:0}65%{transform:scale(1.08)}85%{transform:scale(.97)}100%{transform:scale(1);opacity:1}}
+@keyframes slideIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-4px)}40%,80%{transform:translateX(4px)}}
+.au{animation:up .42s ease both}
+.af{animation:fade .28s ease both}
+.rring{animation:ripple 2s ease infinite}
+
+</style>
+</head>
+<body>
+<div id="toast-wrap"></div>
+<div class="app-wrap">
+  <div class="shell" id="shell">
+    <div class="island"></div>
+    <div class="scr af" id="screen"></div>
+  </div>
+  <div class="dot-nav" id="dots"></div>
+</div>
+<script>
+/* GigShield — Trigger-Based Payout System */
+
+// ── DATABASE ──────────────────────────────────────────
+const DB = { users: [], policies: [], claims: [], events: [] };
+
+// ── TRIGGERS ──────────────────────────────────────────
+const TRIGGERS = [
+  { id: "rain", icon: "🌧️", label: "Heavy Rain / Flood", desc: "Red alert rainfall or urban flooding disrupting deliveries", payout: 350, color: "var(--blu)", bg: "var(--blug)" },
+  { id: "aqi", icon: "😷", label: "Severe Air Quality", desc: "AQI exceeds 300 — hazardous for outdoor workers", payout: 250, color: "var(--red)", bg: "var(--redg)" },
+  { id: "bandh", icon: "🚫", label: "Bandh / Strike", desc: "Official bandh or Section 144 imposed in area", payout: 400, color: "var(--yel)", bg: "var(--yelg)" },
+  { id: "downtime", icon: "⚙️", label: "Platform Downtime", desc: "Zomato/Swiggy app outage lasting 2+ hours", payout: 200, color: "var(--pur)", bg: "var(--purg)" },
+  { id: "heat", icon: "🌡️", label: "Extreme Heatwave", desc: "Temperature exceeds 45°C — IMD red alert", payout: 300, color: "var(--acc)", bg: "var(--accg)" },
+];
+
+// ── CITY DATA ─────────────────────────────────────────
+const CITY_AREAS = {
+  "Bengaluru": ["Koramangala", "Indiranagar", "HSR Layout", "Whitefield", "Jayanagar", "Electronic City"],
+  "Mumbai": ["Andheri", "Bandra", "Kurla", "Dharavi", "Borivali", "Dadar"],
+  "Delhi NCR": ["Connaught Place", "Rohini", "Dwarka", "Noida Sec 18", "Gurgaon", "Saket"],
+  "Chennai": ["T. Nagar", "Adyar", "Velachery", "Anna Nagar", "OMR", "Tambaram"],
+  "Hyderabad": ["Banjara Hills", "Hitech City", "Gachibowli", "Ameerpet", "Secunderabad", "Kukatpally"],
+};
+
+// ── APP STATE ─────────────────────────────────────────
+const S = {
+  screen: 0, role: "", // "user" or "admin"
+  name: "", phone: "", upi: "", platform: "", city: "", area: "", earnings: 0, tenure: 6,
+  otpSent: false, otp: Array(6).fill(""), kycOk: false, pStep: 1,
+  user: null, policy: null,
+  adminPin: "1234", adminAuth: false,
+  activeTriggers: {}, // id -> {active:bool, ts:number}
+  tab: "home", adminTab: "triggers",
+};
+
+// ── HELPERS ───────────────────────────────────────────
+const uid = () => Math.random().toString(36).slice(2, 9);
+const fmt = n => "₹" + Number(n).toLocaleString("en-IN");
+const timeAgo = ts => { const m = Math.floor((Date.now() - ts) / 60000); return m < 1 ? "Just now" : m < 60 ? m + "m ago" : Math.floor(m / 60) + "h ago"; };
+const sbar = (t = "9:41") => `<div class="sbar"><span>${t}</span><div style="display:flex;gap:5px;align-items:center;font-size:11px"><span>●●●</span><span>WiFi</span><span>🔋</span></div></div>`;
+const prog = p => `<div class="prog-wrap"><div class="prog-bar" style="width:${p}%"></div></div>`;
+const hdr = (s, t) => `<div style="margin-bottom:18px"><div style="font-size:11px;color:var(--acc);font-weight:700;letter-spacing:.8px;text-transform:uppercase;margin-bottom:7px">${s}</div><div class="jak" style="font-size:23px;font-weight:800;line-height:1.2">${t}</div></div>`;
+
+function toast(msg, type = "info", icon = "ℹ️", ms = 4500) {
+  const w = document.getElementById("toast-wrap"), el = document.createElement("div");
+  el.className = `toast toast-${type}`;
+  el.innerHTML = `<span style="font-size:16px;flex-shrink:0">${icon}</span><span>${msg}</span>`;
+  w.appendChild(el);
+  setTimeout(() => { el.classList.add("toast-out"); setTimeout(() => el.remove(), 300); }, ms);
+}
+
+function getActiveTriggers() { return TRIGGERS.filter(t => S.activeTriggers[t.id]?.active); }
+function getTotalPayout() { return getActiveTriggers().reduce((s, t) => s + t.payout, 0); }
+
+// ── CLAIMS ────────────────────────────────────────────
+function processClaim(user, trigger) {
+  const c = {
+    id: "CLM" + Date.now().toString().slice(-8),
+    userId: user.id, userName: user.name, trigId: trigger.id,
+    trigLabel: trigger.label, trigIcon: trigger.icon,
+    amount: trigger.payout, status: "paid", ts: Date.now(),
+  };
+  DB.claims.unshift(c);
+  return c;
+}
+
+// ── USER LOGOUT ──────────────────────────────────────
+function userLogout() {
+  // Clear session state — DB.claims, DB.users, DB.policies, activeTriggers all persist
+  S.name = ""; S.phone = ""; S.upi = ""; S.platform = ""; S.city = ""; S.area = "";
+  S.earnings = 0; S.tenure = 6; S.otpSent = false; S.otp = Array(6).fill("");
+  S.kycOk = false; S.pStep = 1; S.user = null; S.policy = null;
+  S.role = ""; S.tab = "home";
+  toast("Logged out successfully", "info", "👋", 3000);
+  go(1);
+}
+
+// ── NAVIGATION ────────────────────────────────────────
+const SCREENS = ["splash", "roleSelect", "otp", "kyc", "profile", "quote", "userDash", "adminLogin", "adminDash"];
+function go(i) { S.screen = Math.max(0, Math.min(i, SCREENS.length - 1)); render(); }
+function render() {
+  const el = document.getElementById("screen");
+  el.className = "scr af"; void el.offsetWidth;
+  el.innerHTML = FNS[SCREENS[S.screen]]();
+  dots(); bind();
+}
+function dots() {
+  const d = document.getElementById("dots");
+  // Only show dots for user onboarding flow
+  if (S.role === "admin" || S.screen >= 6) { d.innerHTML = ""; return; }
+  const flow = [0, 1, 2, 3, 4, 5];
+  d.innerHTML = flow.map((_, i) => `<div class="dot" data-i="${i}" style="width:${i === S.screen ? 22 : 8}px;background:${i === S.screen ? "var(--acc)" : i < S.screen ? "var(--grn)" : "var(--bdr)"}"></div>`).join("");
+}
+
+// ══════════════════════════════════════════════════════
+// SCREENS
+// ══════════════════════════════════════════════════════
+const FNS = {
+
+splash: () => `
+<div style="padding:16px 24px 36px;height:100%;display:flex;flex-direction:column">
+  ${sbar()}
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+    <div class="au">
+      <div style="width:68px;height:68px;border-radius:20px;background:linear-gradient(145deg,#F97316,#c2571a);display:flex;align-items:center;justify-content:center;font-size:30px;margin-bottom:20px;box-shadow:0 14px 36px rgba(249,115,22,.32)">🛡️</div>
+      <div class="jak" style="font-size:32px;font-weight:800;line-height:1.1;margin-bottom:6px">Gig<span style="color:var(--acc)">Shield</span></div>
+      <div style="font-size:14px;color:var(--sub);line-height:1.65;margin-bottom:24px">Income protection for delivery partners.<br>Automatic payouts when disruptions hit.</div>
+      ${[["⚡","5 trigger events — rain, AQI, bandh & more"],["💸","Instant UPI payout on trigger activation"],["🔒","Admin-controlled · Verified claims only"]].map(([ic, tx], i) => `
+        <div class="au" style="display:flex;gap:12px;align-items:flex-start;margin-bottom:11px;animation-delay:${i * .08}s">
+          <div style="width:30px;height:30px;border-radius:9px;background:var(--accg);border:1px solid rgba(249,115,22,.2);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">${ic}</div>
+          <span style="font-size:13px;color:var(--sub);line-height:1.55;padding-top:5px">${tx}</span>
+        </div>`).join("")}
+    </div>
+    <div class="au" style="animation-delay:.28s;display:flex;flex-direction:column;gap:10px;margin-top:6px">
+      <button class="btn" id="btn-start">Get Started</button>
+      <div style="text-align:center;font-size:12px;color:var(--muted)">For gig delivery partners & administrators</div>
+    </div>
+  </div>
+</div>`,
+
+roleSelect: () => `
+<div style="padding:16px 24px 36px;height:100%;display:flex;flex-direction:column">
+  ${sbar()}
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+    <div class="au">
+      ${hdr("SELECT ROLE", "How are you using GigShield?")}
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <button class="card au" id="btn-role-user" style="cursor:pointer;text-align:left;border:1.5px solid var(--bdr);transition:all .2s">
+          <div style="display:flex;gap:14px;align-items:center">
+            <div style="width:52px;height:52px;border-radius:16px;background:var(--grng);border:1px solid rgba(34,197,94,.2);display:flex;align-items:center;justify-content:center;font-size:24px">🛵</div>
+            <div>
+              <div class="jak" style="font-size:17px;font-weight:700;margin-bottom:3px">Gig Worker</div>
+              <div style="font-size:12px;color:var(--sub);line-height:1.5">Delivery partner on Zomato, Swiggy, etc.<br>View triggers & claim payouts</div>
+            </div>
+          </div>
+        </button>
+        <button class="card au" id="btn-role-admin" style="cursor:pointer;text-align:left;border:1.5px solid var(--bdr);transition:all .2s;animation-delay:.1s">
+          <div style="display:flex;gap:14px;align-items:center">
+            <div style="width:52px;height:52px;border-radius:16px;background:var(--purg);border:1px solid rgba(168,85,247,.2);display:flex;align-items:center;justify-content:center;font-size:24px">🔐</div>
+            <div>
+              <div class="jak" style="font-size:17px;font-weight:700;margin-bottom:3px">Administrator</div>
+              <div style="font-size:12px;color:var(--sub);line-height:1.5">Control triggers, manage payouts,<br>oversee claims pipeline</div>
+            </div>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>`,
+
+adminLogin: () => `
+<div style="padding:16px 24px 36px;height:100%;display:flex;flex-direction:column">
+  ${sbar()}
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+    <div class="au">
+      <div style="width:60px;height:60px;border-radius:18px;background:var(--purg);border:1px solid rgba(168,85,247,.2);display:flex;align-items:center;justify-content:center;font-size:26px;margin-bottom:18px">🔐</div>
+      ${hdr("ADMIN ACCESS", "Enter admin PIN")}
+      <div style="font-size:13px;color:var(--sub);margin-bottom:20px;line-height:1.6">Restricted access. Enter the 4-digit admin PIN to continue.</div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <input class="fld" id="inp-pin" type="password" placeholder="••••" maxlength="4" style="text-align:center;font-size:24px;letter-spacing:12px"/>
+        <button class="btn" id="btn-admin-login" disabled>Authenticate →</button>
+        <button class="btn-ghost" id="btn-admin-back">← Back to role select</button>
+        <div style="text-align:center;font-size:11px;color:var(--muted)">Demo PIN: 1234</div>
+      </div>
+    </div>
+  </div>
+</div>`,
+
+otp: () => `
+<div style="padding:16px 24px 36px">${sbar()}
+  <div style="margin-top:18px">
+    ${prog(S.otpSent ? 38 : 18)}
+    ${hdr("Step 1 of 4", S.otpSent ? "Enter the code" : "Your details")}
+    <div style="font-size:13px;color:var(--sub);margin-bottom:20px;line-height:1.6">${S.otpSent ? `Code sent to +91 ${S.phone.slice(0, 5)}XXXXX` : "We'll send a one-time code. No spam."}</div>
+    ${!S.otpSent ? `
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div><label class="lbl">Your Name</label><input class="fld" id="inp-name" type="text" placeholder="e.g. Ravi Kumar" value="${S.name}"/></div>
+        <div><label class="lbl">Mobile Number</label>
+          <div style="display:flex;gap:8px">
+            <div style="padding:13px 11px;background:var(--card);border:1px solid var(--bdr);border-radius:12px;font-size:14px;color:var(--sub);white-space:nowrap">🇮🇳 +91</div>
+            <input class="fld" id="inp-phone" type="tel" placeholder="98765 43210" value="${S.phone}" maxlength="10"/>
+          </div>
+        </div>
+        <button class="btn" id="btn-send" ${S.phone.length < 10 || !S.name ? "disabled" : ""}>Send OTP</button>
+      </div>` : `
+      <div style="display:flex;flex-direction:column;gap:20px">
+        <div class="otp-row">${S.otp.map((d, i) => `<input class="otp-c ${d ? "on" : ""}" data-i="${i}" maxlength="1" value="${d}" type="tel"/>`).join("")}</div>
+        <button class="btn" id="btn-verify">Verify & Continue →</button>
+      </div>`}
+  </div>
+</div>`,
+
+kyc: () => `
+<div style="padding:16px 24px 36px">${sbar()}
+  <div style="margin-top:18px">
+    ${prog(38)}
+    ${hdr("Step 2 of 4", "Quick verification")}
+    <div style="font-size:13px;color:var(--sub);margin-bottom:20px;line-height:1.6">One-time KYC. Under a minute.</div>
+    ${!S.kycOk ? `
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div><label class="lbl">Aadhaar Number</label><input class="fld" id="inp-aadh" type="tel" placeholder="1234 5678 9012" maxlength="14"/><div class="hint">Identity check only · Not stored raw</div></div>
+        <div><label class="lbl">UPI ID (payouts go here)</label><input class="fld" id="inp-upi" type="text" placeholder="name@phonepe" value="${S.upi}"/><div class="hint">Must have @ · Double-check before saving</div></div>
+        <div class="card-sm" style="background:rgba(249,115,22,.06);border-color:rgba(249,115,22,.2);display:flex;gap:10px;align-items:flex-start">
+          <span style="font-size:17px;flex-shrink:0">🔒</span>
+          <div style="font-size:12px;color:var(--sub);line-height:1.6">UIDAI e-KYC verified. SHA-256 hashed. One Aadhaar = one policy.</div>
+        </div>
+        <button class="btn" id="btn-kyc" disabled>Verify My Identity →</button>
+      </div>` : `
+      <div class="au" style="text-align:center;padding-top:20px">
+        <div style="width:76px;height:76px;border-radius:50%;background:var(--grng);border:2px solid var(--grn);display:flex;align-items:center;justify-content:center;font-size:34px;margin:0 auto 16px;animation:pop .6s cubic-bezier(.34,1.56,.64,1) both">✅</div>
+        <div class="jak" style="font-size:20px;font-weight:800;margin-bottom:6px">You're verified</div>
+        <div style="font-size:13px;color:var(--sub);margin-bottom:5px">Aadhaar confirmed · UPI linked</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:26px;font-style:italic">${S.upi}</div>
+        <button class="btn" id="btn-kyc-next">Set Up My Profile →</button>
+      </div>`}
+  </div>
+</div>`,
+
+profile: () => {
+  const ps = S.pStep, areas = S.city ? CITY_AREAS[S.city] || [] : [];
+  const earn = parseInt(S.earnings) || 0;
+  return `<div style="padding:16px 24px 36px">${sbar()}
+  <div style="margin-top:18px">
+    ${prog(ps === 1 ? 54 : ps === 2 ? 68 : 82)}
+    ${hdr("Step 3 of 4", ps === 1 ? "Where you work" : ps === 2 ? "Your area" : "Your earnings")}
+    ${ps === 1 ? `<div class="au" style="display:flex;flex-direction:column;gap:14px">
+      <div><label class="lbl">Platform</label>
+        <div class="seg-row">${[["🍽️", "Zomato"], ["🛵", "Swiggy"], ["📦", "Both"]].map(([ic, p]) => `<button class="seg ${S.platform === p ? "on" : ""}" data-plat="${p}"><span style="font-size:22px">${ic}</span><span class="slbl">${p}</span></button>`).join("")}</div>
+      </div>
+      <div><label class="lbl">City</label>
+        <select class="fld" id="sel-city" style="cursor:pointer"><option value="">Pick your city</option>${Object.keys(CITY_AREAS).map(c => `<option value="${c}" ${S.city === c ? "selected" : ""}>${c}</option>`).join("")}</select>
+      </div>
+      <button class="btn" id="btn-p1" ${!S.platform || !S.city ? "disabled" : ""}>Continue →</button>
+    </div>` : ps === 2 ? `<div class="au" style="display:flex;flex-direction:column;gap:14px">
+      <div><label class="lbl">Your main delivery area</label>
+        <div class="area-grid">${areas.map(a => `<button class="area-tile ${S.area === a ? "on" : ""}" data-area="${a}">${a}</button>`).join("")}</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-ghost" id="btn-p2back" style="width:auto;padding:14px 16px">←</button>
+        <button class="btn" id="btn-p2" ${!S.area ? "disabled" : ""}>Continue →</button>
+      </div>
+    </div>` : `<div class="au" style="display:flex;flex-direction:column;gap:14px">
+      <div><label class="lbl">Avg. weekly earnings (₹)</label>
+        <input class="fld" id="inp-earn" type="text" inputmode="numeric" placeholder="e.g. 4200" value="${S.earnings || ""}"/>
+        <div class="hint">Your last 4-week average</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-ghost" id="btn-p3back" style="width:auto;padding:14px 16px">←</button>
+        <button class="btn" id="btn-p3" ${!earn || earn < 500 ? "disabled" : ""}>See My Plan →</button>
+      </div>
+    </div>`}
+  </div></div>`;
+},
+
+quote: () => {
+  const premium = 49;
+  return `<div style="padding:16px 24px 36px">${sbar()}
+  <div style="margin-top:18px">
+    ${prog(92)}
+    ${hdr("Step 4 of 4", "Your protection plan")}
+    <div class="card au" style="border-color:var(--acc);background:linear-gradient(145deg,var(--card),var(--accg));margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div class="jak" style="font-size:14px;font-weight:700">Weekly Shield</div>
+        <div class="pill" style="background:var(--accg);color:var(--acc);border:1px solid rgba(249,115,22,.3)">TRIGGER-BASED</div>
+      </div>
+      <div style="margin-bottom:14px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:2px">Weekly premium</div>
+        <div class="jak" style="font-size:34px;font-weight:800;color:var(--acc);line-height:1">${fmt(premium)}<span style="font-size:13px;color:var(--muted);font-weight:400">/wk</span></div>
+      </div>
+      <div class="div" style="margin-bottom:11px"></div>
+      <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Covered triggers & payouts</div>
+      ${TRIGGERS.map((t, i, a) => `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;${i < a.length - 1 ? "border-bottom:1px solid var(--bdr)" : ""}">
+        <div style="display:flex;gap:7px;align-items:center;font-size:12px;color:var(--sub)">${t.icon} ${t.label}</div>
+        <div class="jak" style="font-size:13px;font-weight:700;color:var(--grn)">${fmt(t.payout)}</div>
+      </div>`).join("")}
+    </div>
+    <button class="btn" id="btn-activate">Activate for ${fmt(premium)}/week →</button>
+    <div style="text-align:center;font-size:11px;color:var(--muted);margin-top:9px">UPI AutoPay every Monday · Cancel anytime</div>
+  </div></div>`;
+},
+
+userDash: () => {
+  const active = getActiveTriggers();
+  const totalPayout = getTotalPayout();
+  const myClaims = DB.claims.filter(c => c.userId === S.user?.id);
+  const totalClaimed = myClaims.reduce((s, c) => s + c.amount, 0);
+  const canClaim = active.filter(t => !myClaims.some(c => c.trigId === t.id && Date.now() - c.ts < 3600000));
+
+  const homeTab = () => `
+    <div class="card" style="background:linear-gradient(145deg,#0e1e35,#162840);border-color:rgba(34,197,94,.25);position:relative;overflow:hidden;margin-bottom:11px">
+      <div style="position:absolute;top:-20px;right:-20px;width:80px;height:80px;border-radius:50%;background:rgba(34,197,94,.07);filter:blur(20px)"></div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+        <div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+            <div style="width:7px;height:7px;border-radius:50%;background:var(--grn);box-shadow:0 0 7px var(--grn)"></div>
+            <span style="font-size:10px;color:var(--grn);font-weight:700;letter-spacing:.5px">SHIELD ACTIVE</span>
+          </div>
+          <div class="jak" style="font-size:16px;font-weight:700">${S.area}, ${S.city}</div>
+        </div>
+        <span style="font-size:26px">🛡️</span>
+      </div>
+      <div style="display:flex;gap:9px">
+        <div style="flex:1;padding:10px;background:rgba(255,255,255,.04);border-radius:10px;border:1px solid rgba(255,255,255,.06)">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:2px">Total claimed</div>
+          <div class="jak" style="font-size:16px;font-weight:800;color:var(--grn)">${fmt(totalClaimed)}</div>
+        </div>
+        <div style="flex:1;padding:10px;background:rgba(255,255,255,.04);border-radius:10px;border:1px solid rgba(255,255,255,.06)">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:2px">Active triggers</div>
+          <div class="jak" style="font-size:16px;font-weight:800;color:${active.length ? "var(--red)" : "var(--sub)"}">${active.length}</div>
+        </div>
+      </div>
+    </div>
+
+    ${active.length > 0 ? `
+    <div style="background:var(--redg);border:1.5px solid rgba(239,68,68,.3);border-radius:16px;padding:15px;margin-bottom:11px">
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:10px">
+        <div style="width:8px;height:8px;border-radius:50%;background:var(--red);animation:breathe 1s infinite"></div>
+        <span style="font-size:12px;font-weight:700;color:var(--red)">⚡ ${active.length} ACTIVE TRIGGER${active.length > 1 ? "S" : ""}</span>
+      </div>
+      ${active.map(t => `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(239,68,68,.15)">
+        <div style="font-size:13px;color:var(--txt)">${t.icon} ${t.label}</div>
+        <div class="jak" style="font-size:14px;font-weight:800;color:var(--grn)">${fmt(t.payout)}</div>
+      </div>`).join("")}
+      ${canClaim.length > 0 ? `
+      <div style="margin-top:12px;text-align:center">
+        <div style="font-size:11px;color:var(--sub);margin-bottom:8px">Total claimable: <strong style="color:var(--grn)">${fmt(canClaim.reduce((s, t) => s + t.payout, 0))}</strong></div>
+        <button class="btn-grn" id="btn-claim" style="animation:pop .5s ease both">💸 Claim Payout Now</button>
+      </div>` : `<div style="margin-top:10px;text-align:center;font-size:12px;color:var(--muted)">✓ Already claimed for current triggers</div>`}
+    </div>` : `
+    <div class="card" style="background:rgba(249,115,22,.07);border-color:rgba(249,115,22,.25);display:flex;gap:11px;margin-bottom:11px">
+      <div style="position:relative;flex-shrink:0;width:38px;height:38px">
+        <div style="width:38px;height:38px;border-radius:50%;background:rgba(249,115,22,.15);display:flex;align-items:center;justify-content:center;font-size:18px;position:relative;z-index:1">🛡️</div>
+        <div class="rring" style="position:absolute;top:0;left:0;width:38px;height:38px;border-radius:50%;border:1.5px solid var(--acc)"></div>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:12px;font-weight:700;color:var(--acc);margin-bottom:3px">All Clear</div>
+        <div style="font-size:12px;color:var(--sub);line-height:1.55">No active disruptions in your area. Your shield is ready and will notify you instantly when a trigger fires.</div>
+      </div>
+    </div>`}`;
+
+  const triggersTab = () => `
+    <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">All covered triggers</div>
+    ${TRIGGERS.map(t => {
+      const isActive = S.activeTriggers[t.id]?.active;
+      return `<div class="trig-card ${isActive ? "active" : ""}">
+        <div class="trig-head">
+          <div style="display:flex;gap:10px;align-items:center">
+            <span style="font-size:22px">${t.icon}</span>
+            <div>
+              <div style="font-size:13px;font-weight:600;color:${isActive ? "var(--red)" : "var(--txt)"}">${t.label}</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:1px">${t.desc}</div>
+            </div>
+          </div>
+          <div style="text-align:right">
+            <div class="badge ${isActive ? "badge-r" : "badge-g"}">${isActive ? "ACTIVE" : "CLEAR"}</div>
+            <div class="jak" style="font-size:14px;font-weight:800;color:var(--grn);margin-top:4px">${fmt(t.payout)}</div>
+          </div>
+        </div>
+        ${isActive ? `<div class="trig-body">⚠️ Triggered ${timeAgo(S.activeTriggers[t.id].ts)} — you're eligible for payout</div>` : ""}
+      </div>`;
+    }).join("")}`;
+
+  const historyTab = () => `
+    <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Claim history · ${myClaims.length} total</div>
+    ${myClaims.length === 0 ? `<div class="card-sm" style="text-align:center;color:var(--muted);font-size:13px;padding:18px">No claims yet — triggers will appear here</div>` : `
+    <div class="card" style="padding:0">
+      ${myClaims.slice(0, 10).map(c => `<div class="claim-item">
+        <div>
+          <div style="font-size:13px;font-weight:500">${c.trigIcon} ${c.trigLabel}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:1px">${new Date(c.ts).toLocaleDateString("en-IN")} · ${c.id}</div>
+        </div>
+        <div style="text-align:right">
+          <div class="jak" style="font-size:15px;font-weight:800;color:var(--grn)">${fmt(c.amount)}</div>
+          <div class="badge badge-g" style="margin-top:3px">Paid</div>
+        </div>
+      </div>`).join("")}
+    </div>`}`;
+
+  const content = S.tab === "home" ? homeTab() : S.tab === "triggers" ? triggersTab() : historyTab();
+  const myCnt = DB.claims.filter(c => c.userId === S.user?.id).length;
+  return `<div style="height:100%;display:flex;flex-direction:column">
+    ${sbar("6:52 PM")}
+    <div style="padding:10px 22px 6px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:12px;color:var(--muted)">Good evening,</div>
+        <div class="jak" style="font-size:20px;font-weight:800">${S.name || "Ravi"} 👋</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button id="btn-user-logout" style="padding:5px 11px;background:transparent;border:1px solid var(--bdr);border-radius:8px;color:var(--muted);font-size:11px;cursor:pointer;font-family:inherit;transition:all .2s" onmouseover="this.style.borderColor='var(--acc)';this.style.color='var(--acc)'" onmouseout="this.style.borderColor='var(--bdr)';this.style.color='var(--muted)'">Logout</button>
+        <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#F97316,#c2571a);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff">${(S.name || "R")[0].toUpperCase()}</div>
+      </div>
+    </div>
+    <div class="inner-scroll" style="flex:1;padding:10px 20px 78px">${content}</div>
+    <div class="bnav">
+      ${[["🛡️", "Home", "home"], ["⚡", "Triggers", "triggers"], ["📋", "History", "history"]].map(([ic, lb, id]) => `
+        <button class="bnav-btn" data-tab="${id}" style="color:${S.tab === id ? "var(--acc)" : "var(--muted)"}">
+          <div style="position:relative;display:inline-block">
+            <span style="font-size:20px">${ic}</span>
+            ${id === "history" && myCnt > 0 ? `<span style="position:absolute;top:-4px;right:-6px;width:14px;height:14px;background:var(--red);border-radius:50%;font-size:8px;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center;line-height:1">${myCnt}</span>` : ""}
+          </div>
+          <span class="bnav-lbl">${lb}</span>
+        </button>`).join("")}
+    </div>
+  </div>`;
+},
+
+adminDash: () => {
+  const active = getActiveTriggers();
+  const triggersPanel = () => `
+    <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Trigger control panel</div>
+    <div style="font-size:12px;color:var(--sub);margin-bottom:14px;line-height:1.5">Toggle triggers on/off. Changes reflect instantly on all user dashboards.</div>
+    ${TRIGGERS.map(t => {
+      const isOn = S.activeTriggers[t.id]?.active;
+      return `<div class="admin-trig ${isOn ? "on" : ""}">
+        <div class="at-icon" style="background:${t.bg};border:1px solid ${t.color}20">${t.icon}</div>
+        <div class="at-info">
+          <div class="at-label">${t.label}</div>
+          <div class="at-sub">${t.desc}</div>
+          <div class="at-payout">Payout: ${fmt(t.payout)}</div>
+        </div>
+        <div class="toggle-wrap">
+          <input type="checkbox" class="toggle-input" id="trig-${t.id}" data-trig="${t.id}" ${isOn ? "checked" : ""}/>
+          <label class="toggle-track" for="trig-${t.id}"></label>
+          <div class="toggle-knob"></div>
+        </div>
+      </div>`;
+    }).join("")}
+    ${active.length > 0 ? `<div class="card-sm au" style="background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.2);margin-top:12px">
+      <div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:4px">⚡ ${active.length} trigger${active.length > 1 ? "s" : ""} active</div>
+      <div style="font-size:12px;color:var(--sub)">All eligible users in affected areas can now claim payouts.</div>
+    </div>` : ""}
+    <button class="btn-red" id="btn-all-off" style="margin-top:12px">Deactivate All Triggers</button>`;
+
+  const claimsPanel = () => `
+    <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Claims overview · ${DB.claims.length} total</div>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      ${[["Total Claims", DB.claims.length, "var(--blu)"], ["Total Paid", fmt(DB.claims.reduce((s, c) => s + c.amount, 0)), "var(--grn)"], ["Active Trigs", active.length, "var(--red)"]].map(([l, v, c]) => `
+        <div style="flex:1;padding:10px;background:var(--surf);border-radius:12px;border:1px solid var(--bdr);text-align:center">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:3px">${l}</div>
+          <div class="jak" style="font-size:16px;font-weight:800;color:${c}">${v}</div>
+        </div>`).join("")}
+    </div>
+    ${DB.claims.length === 0 ? `<div class="card-sm" style="text-align:center;color:var(--muted);font-size:13px;padding:18px">No claims processed yet</div>` : `
+    <div class="card" style="padding:0">
+      ${DB.claims.slice(0, 8).map(c => `<div class="claim-item">
+        <div>
+          <div style="font-size:12px;font-weight:600">${c.trigIcon} ${c.userName}</div>
+          <div style="font-size:10px;color:var(--muted)">${c.id} · ${timeAgo(c.ts)}</div>
+        </div>
+        <div style="text-align:right">
+          <div class="jak" style="font-size:14px;font-weight:800;color:var(--grn)">${fmt(c.amount)}</div>
+          <div class="badge badge-g" style="margin-top:2px">Paid</div>
+        </div>
+      </div>`).join("")}
+    </div>`}`;
+
+  const content = S.adminTab === "triggers" ? triggersPanel() : claimsPanel();
+  return `<div style="height:100%;display:flex;flex-direction:column">
+    ${sbar("6:52 PM")}
+    <div style="padding:10px 22px 6px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:12px;color:var(--muted)">Admin Panel</div>
+        <div class="jak" style="font-size:20px;font-weight:800">GigShield 🔐</div>
+      </div>
+      <button id="btn-admin-logout" style="padding:6px 12px;background:var(--card);border:1px solid var(--bdr);border-radius:8px;color:var(--sub);font-size:11px;cursor:pointer;font-family:inherit">Logout</button>
+    </div>
+    <div class="inner-scroll" style="flex:1;padding:10px 20px 78px">${content}</div>
+    <div class="bnav">
+      ${[["⚡", "Triggers", "triggers"], ["📋", "Claims", "claims"]].map(([ic, lb, id]) => `
+        <button class="bnav-btn" data-admtab="${id}" style="color:${S.adminTab === id ? "var(--acc)" : "var(--muted)"}">
+          <div style="position:relative;display:inline-block">
+            <span style="font-size:20px">${ic}</span>
+            ${id === "claims" && DB.claims.length > 0 ? `<span style="position:absolute;top:-4px;right:-6px;min-width:14px;height:14px;background:var(--grn);border-radius:7px;font-size:8px;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center;padding:0 3px;line-height:1">${DB.claims.length}</span>` : ""}
+          </div>
+          <span class="bnav-lbl">${lb}</span>
+        </button>`).join("")}
+    </div>
+  </div>`;
+},
+}; // end FNS
+
+// ══════════════════════════════════════════════════════
+// EVENT BINDING
+// ══════════════════════════════════════════════════════
+function bind() {
+  const on = (id, ev, fn) => { const el = document.getElementById(id); if (el) el.addEventListener(ev, fn); };
+  const q = (s, fn) => document.querySelectorAll(s).forEach(fn);
+
+  on("btn-start", "click", () => go(1));
+
+  // Role select
+  on("btn-role-user", "click", () => { S.role = "user"; go(2); });
+  on("btn-role-admin", "click", () => { S.role = "admin"; go(7); });
+
+  // Admin login
+  on("inp-pin", "input", e => {
+    const b = document.getElementById("btn-admin-login");
+    if (b) b.disabled = e.target.value.length < 4;
+  });
+  on("btn-admin-login", "click", () => {
+    const pin = document.getElementById("inp-pin")?.value;
+    if (pin === S.adminPin) { S.adminAuth = true; toast("Welcome, Admin", "ok", "🔐"); go(8); }
+    else { toast("Invalid PIN", "bad", "🚫"); document.getElementById("inp-pin").style.animation = "shake .4s ease"; }
+  });
+  on("btn-admin-back", "click", () => go(1));
+  on("btn-admin-logout", "click", () => { S.adminAuth = false; S.role = ""; go(1); });
+
+  // OTP
+  const syncSendBtn = () => {
+    const n = document.getElementById("inp-name"), p = document.getElementById("inp-phone"), b = document.getElementById("btn-send");
+    if (b) b.disabled = !(n?.value.trim() && p?.value.length >= 10);
+  };
+  on("inp-name", "input", e => { S.name = e.target.value.trim(); syncSendBtn(); });
+  on("inp-phone", "input", e => { S.phone = e.target.value.replace(/\D/g, "").slice(0, 10); syncSendBtn(); });
+  on("btn-send", "click", () => {
+    const b = document.getElementById("btn-send");
+    if (b) { b.textContent = "Sending…"; b.disabled = true; }
+    setTimeout(() => { S.otpSent = true; render(); }, 1000);
+  });
+  q(".otp-c", el => {
+    el.addEventListener("input", e => {
+      const i = +el.dataset.i; S.otp[i] = e.target.value.slice(-1);
+      el.className = "otp-c" + (S.otp[i] ? " on" : "");
+      const nxt = document.querySelector(`.otp-c[data-i="${i + 1}"]`);
+      if (e.target.value && nxt) nxt.focus();
+      if (S.otp.every(d => d)) setTimeout(() => go(3), 450);
+    });
+    el.addEventListener("keydown", e => {
+      if (e.key === "Backspace" && !S.otp[+el.dataset.i]) {
+        const p = document.querySelector(`.otp-c[data-i="${+el.dataset.i - 1}"]`);
+        if (p) p.focus();
+      }
+    });
+  });
+  on("btn-verify", "click", () => go(3));
+
+  // KYC
+  const kycChk = () => {
+    const a = document.getElementById("inp-aadh"), u = document.getElementById("inp-upi"), b = document.getElementById("btn-kyc");
+    if (b) b.disabled = !(a?.value.replace(/\s/g, "").length >= 12 && u?.value.includes("@"));
+  };
+  on("inp-aadh", "input", e => {
+    let d = e.target.value.replace(/\D/g, "").slice(0, 12);
+    e.target.value = d.replace(/(\d{4})(\d{0,4})(\d{0,4})/, "$1 $2 $3").trim();
+    kycChk();
+  });
+  on("inp-upi", "input", kycChk);
+  on("btn-kyc", "click", () => {
+    S.upi = document.getElementById("inp-upi")?.value.trim();
+    const b = document.getElementById("btn-kyc");
+    if (b) { b.textContent = "Checking…"; b.disabled = true; b.style.animation = "breathe 1s infinite"; }
+    S.user = { id: uid(), name: S.name, phone: S.phone, upi: S.upi, area: "", city: "", earnings: 0 };
+    DB.users.push(S.user);
+    setTimeout(() => { S.kycOk = true; render(); }, 1400);
+  });
+  on("btn-kyc-next", "click", () => { S.pStep = 1; go(4); });
+
+  // Profile
+  q("[data-plat]", el => el.addEventListener("click", () => {
+    S.platform = el.dataset.plat;
+    q("[data-plat]", e => e.classList.toggle("on", e.dataset.plat === S.platform));
+    const b = document.getElementById("btn-p1"); if (b) b.disabled = !S.platform || !S.city;
+  }));
+  on("sel-city", "change", e => { S.city = e.target.value; S.area = ""; const b = document.getElementById("btn-p1"); if (b) b.disabled = !S.platform || !S.city; });
+  on("btn-p1", "click", () => { if (S.platform && S.city) { S.pStep = 2; render(); } });
+  q("[data-area]", el => el.addEventListener("click", () => {
+    S.area = el.dataset.area;
+    q("[data-area]", e => e.classList.toggle("on", e.dataset.area === S.area));
+    const b = document.getElementById("btn-p2"); if (b) b.disabled = false;
+  }));
+  on("btn-p2back", "click", () => { S.pStep = 1; render(); });
+  on("btn-p2", "click", () => { if (S.area) { S.pStep = 3; render(); } });
+  on("inp-earn", "input", e => {
+    const raw = e.target.value.replace(/[^0-9]/g, "");
+    if (e.target.value !== raw) e.target.value = raw;
+    S.earnings = parseInt(raw) || 0;
+    const b = document.getElementById("btn-p3"); if (b) b.disabled = !S.earnings || S.earnings < 500;
+  });
+  on("btn-p3back", "click", () => { S.pStep = 2; render(); });
+  on("btn-p3", "click", () => {
+    if (!S.earnings || S.earnings < 500) return;
+    if (S.user) Object.assign(S.user, { area: S.area, city: S.city, earnings: S.earnings });
+    go(5);
+  });
+
+  // Quote
+  on("btn-activate", "click", () => {
+    const b = document.getElementById("btn-activate");
+    if (b) { b.textContent = "⚡ Activating…"; b.disabled = true; b.style.animation = "breathe 1s infinite"; }
+    S.policy = { id: "POL" + uid(), userId: S.user?.id, status: "active", premium: 49, area: S.area, city: S.city };
+    DB.policies.push(S.policy);
+    toast("🛡️ Shield activated! You'll see payouts when triggers fire.", "ok", "🛡️", 5000);
+    setTimeout(() => go(6), 1300);
+  });
+
+  // User dash tabs
+  q("[data-tab]", el => el.addEventListener("click", () => { S.tab = el.dataset.tab; render(); }));
+
+  // User logout
+  on("btn-user-logout", "click", userLogout);
+
+  // Claim payout
+  on("btn-claim", "click", () => {
+    const active = getActiveTriggers();
+    const myClaims = DB.claims.filter(c => c.userId === S.user?.id);
+    const canClaim = active.filter(t => !myClaims.some(c => c.trigId === t.id && Date.now() - c.ts < 3600000));
+    if (canClaim.length === 0) { toast("Already claimed for current triggers", "warn", "⚠️"); return; }
+    let total = 0;
+    canClaim.forEach(t => { const c = processClaim(S.user, t); total += c.amount; });
+    toast(`💸 ${fmt(total)} credited to ${S.upi}!`, "ok", "💸", 6000);
+    render();
+  });
+
+  // Admin dash tabs
+  q("[data-admtab]", el => el.addEventListener("click", () => { S.adminTab = el.dataset.admtab; render(); }));
+
+  // Admin trigger toggles
+  q(".toggle-input[data-trig]", el => el.addEventListener("change", e => {
+    const id = el.dataset.trig;
+    S.activeTriggers[id] = { active: e.target.checked, ts: Date.now() };
+    const trig = TRIGGERS.find(t => t.id === id);
+    if (e.target.checked) {
+      toast(`${trig.icon} ${trig.label} activated — users can now claim ${fmt(trig.payout)}`, "bad", trig.icon, 5000);
+    } else {
+      toast(`${trig.icon} ${trig.label} deactivated`, "info", trig.icon, 3000);
+    }
+    render();
+  }));
+
+  on("btn-all-off", "click", () => {
+    TRIGGERS.forEach(t => S.activeTriggers[t.id] = { active: false, ts: 0 });
+    toast("All triggers deactivated", "info", "✅");
+    render();
+  });
+}
+
+// ── BOOT ──────────────────────────────────────────────
+render();
+
+</script>
+</body>
+</html>
